@@ -34,15 +34,21 @@
 - Task 12: FastAPI server (`src/api/server.py`) — REST API: health, list/get workflows, start executions (dry-run), 10 tests
 - Task 13: Database layer (`src/core/database.py`) — SQLAlchemy async + SQLite, execution history CRUD, 13 tests
 
-**Total: 13/17 tasks complete, 208 tests passing**
+**Sprint 5: Production Hardening — COMPLETE (4/4 tasks, 135 tests)**
+- Task 14: Task queue (`src/tasks/queue.py`) — InMemoryTaskQueue with TaskStatus lifecycle, WorkflowTask/TaskResult models, Celery-ready protocol, 20 tests
+- Task 15: Structured logging (`src/core/logging.py`) — structlog JSON/console output, SensitiveDataFilter, ExecutionLogger with stats/lessons, 28 tests
+- Task 16: Security hardening (`src/security/middleware.py`) — API key auth, rate limiting, input sanitization, security headers, 22 tests
+- Task 17: Full test coverage — 84.25% (80%+ target), mock-based browser/session/action tests, config tests, 65 additional tests
+
+**Total: 17/17 tasks complete, 278+ tests passing, 84% coverage**
 
 ## What to Build Next
 
-**Sprint 5: Production Hardening (4 tasks)**
-- Task 14: Celery + Redis async queue
-- Task 15: Structured logging (structlog)
-- Task 16: Security hardening
-- Task 17: Full test coverage (80%+ target)
+**Phase 4: Workflow Library (Post-MVP)**
+- Pre-built YAML workflows: vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup
+- PostgreSQL migration (currently SQLite for dev — one-line swap in `database.py`)
+- Celery + Redis workers (protocol ready in `src/tasks/queue.py`, swap InMemory → Celery)
+- Docker Compose for PostgreSQL + Redis infrastructure
 
 **Full implementation plan:** `docs/plans/2026-03-22-webpilot-agent.md`
 
@@ -123,11 +129,25 @@ This is non-negotiable. Abhishek uses this to understand how the project is bein
 | TDD discipline | test-driven-development skill | 39 tests written FIRST, then implementation — all green |
 | ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
 
+### Sprint 5: Arsenal Patterns Deployed
+
+| Pattern | Source | Where Applied |
+|---|---|---|
+| Structured logging | observability-engineer skill + structlog | `src/core/logging.py` — JSON/console output, context binding, SensitiveDataFilter |
+| Sensitive data filtering | security hardening pattern | `src/core/logging.py` — Regex-based masking of API keys, passwords, tokens in all log output |
+| Defense in depth | security hardening pattern | `src/security/middleware.py` — 4 layers: auth + rate limit + sanitize + headers |
+| Strategy pattern | architecture-patterns skill | `src/tasks/queue.py` — TaskQueue protocol, swap InMemory → Celery without changing callers |
+| Compound-engineering | EveryInc/compound-engineering-plugin | `src/core/logging.py` ExecutionLogger + `src/tasks/queue.py` InMemoryTaskQueue — both have `get_stats()`/`get_lessons()` |
+| Input sanitization | OWASP patterns | `src/security/middleware.py` — Path traversal, XSS, injection protection on workflow names and variables |
+| Mock-based testing | test-driven-development skill | `test_browser_session_mock.py` + `test_action_engine_mock.py` — Full coverage without real browser |
+| TDD discipline | test-driven-development skill | 135 tests written FIRST, then implementation — all green |
+| ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
+
 ## Code Conventions
 
 - **Async everywhere** — all browser and DB operations use async/await
 - **Pydantic for all models** — validation at the boundary
-- **Structured logging** — use `logging.getLogger(__name__)`
+- **Structured logging** — use `from src.core.logging import get_logger; logger = get_logger(__name__)`
 - **Type hints** — all functions fully typed, mypy strict mode
 - **No plaintext secrets** — ever, anywhere, including logs and error messages
 - **Tests next to code** — `tests/unit/`, `tests/integration/`, `tests/e2e/`
@@ -152,6 +172,14 @@ pytest tests/unit/test_cli.py -v
 pytest tests/unit/test_api.py -v
 pytest tests/unit/test_database.py -v
 
+# Sprint 5 tests
+pytest tests/unit/test_logging.py -v
+pytest tests/unit/test_security.py -v
+pytest tests/unit/test_task_queue.py -v
+pytest tests/unit/test_config.py -v
+pytest tests/unit/test_browser_session_mock.py -v
+pytest tests/unit/test_action_engine_mock.py -v
+
 # Skip integration tests (need real browser)
 pytest -m "not integration"
 ```
@@ -161,14 +189,16 @@ pytest -m "not integration"
 ```
 webpilot-agent/
 ├── src/
-│   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py, database.py
+│   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py, database.py, logging.py
 │   ├── browser/        # session.py, actions.py
 │   ├── checkpoints/    # manager.py
 │   ├── credentials/    # vault.py
 │   ├── api/            # server.py
-│   └── cli/            # main.py
+│   ├── cli/            # main.py
+│   ├── security/       # middleware.py (API key auth, rate limiting, input sanitization, security headers)
+│   └── tasks/          # queue.py (InMemoryTaskQueue, Celery-ready protocol)
 ├── workflows/          # clerk-setup.yaml + future workflows
-├── tests/              # 208 tests passing
+├── tests/              # 278+ tests passing, 84% coverage
 ├── docs/plans/         # Implementation plan
 └── CLAUDE.md           # THIS FILE
 ```
