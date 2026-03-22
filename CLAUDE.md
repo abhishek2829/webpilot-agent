@@ -24,14 +24,14 @@
 - Task 6: Action engine (`src/browser/actions.py`) — 8 action types, two-tier element finding (CSS → LLM vision), retry logic, selector analytics
 - Task 7: LLM brain (`src/core/llm_brain.py`) — Claude vision: find_element, extract_value, understand_page
 
-**Total: 7/17 tasks complete, 105 tests passing**
+**Sprint 3: Orchestration — COMPLETE (3/3 tasks, 64 tests)**
+- Task 8: Checkpoint manager (`src/checkpoints/manager.py`) — CLI + WebSocket + auto-approve modes, 32 tests
+- Task 9: Workflow executor (`src/core/executor.py`) — Central loop: step iteration, checkpoint delegation, variable extraction, recovery delegation, 16 tests
+- Task 10: Recovery engine (`src/core/recovery.py`) — Three-tier: retry → LLM adapt → escalate to checkpoint, 16 tests
+
+**Total: 10/17 tasks complete, 169 tests passing**
 
 ## What to Build Next
-
-**Sprint 3: Orchestration (3 tasks)**
-- Task 8: Checkpoint system (`src/checkpoints/manager.py`) — CLI + WebSocket + auto-approve modes
-- Task 9: Workflow executor (`src/core/executor.py`) — The central loop that runs workflows step-by-step
-- Task 10: Recovery engine (`src/core/recovery.py`) — Three-tier: retry → LLM adapt → escalate to checkpoint
 
 **Sprint 4: Interfaces (3 tasks)**
 - Task 11: CLI (`src/cli/main.py`) — Typer CLI: `webpilot run`, `webpilot list`, `webpilot creds`
@@ -97,6 +97,19 @@ Abhishek's Claude Pro subscription is for chat/Claude Code. The WebPilot agent u
 
 This is non-negotiable. Abhishek uses this to understand how the project is being built.
 
+### Sprint 3: Arsenal Patterns Deployed
+
+| Pattern | Source | Where Applied |
+|---|---|---|
+| Checkpoint protocol | gsd-checkpoint-protocol skill | `src/checkpoints/manager.py` — 3 modes: CLI (human-verify), WebSocket (decision), Auto (trusted) |
+| Compound-engineering | EveryInc/compound-engineering-plugin | All 3 new components: `get_lessons()`, `get_stats()` methods on CheckpointManager, RecoveryEngine, WorkflowExecutor |
+| Three-tier recovery | gsd-checkpoint-protocol + recovery pattern | `src/core/recovery.py` — retry → LLM adapt → escalate to human |
+| Two-tier element finding | playwright-skill + Claude vision | `src/core/recovery.py` — LLM adapt tier uses `find_element()` for new selectors |
+| GSD verification | gsd-verification-patterns skill | `src/core/executor.py` — validates each step result before moving to next |
+| Session persistence | GSD checkpoint + Playwright | `src/core/executor.py` — screenshots at checkpoints, state preservation |
+| TDD discipline | test-driven-development skill | 64 tests written FIRST, then implementation — all green |
+| ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
+
 ## Code Conventions
 
 - **Async everywhere** — all browser and DB operations use async/await
@@ -119,6 +132,9 @@ pytest --cov=src --cov-report=html
 pytest tests/unit/test_vault.py -v
 pytest tests/unit/test_workflow_registry.py -v
 pytest tests/unit/test_browser_engine.py -v
+pytest tests/unit/test_checkpoint_manager.py -v
+pytest tests/unit/test_executor.py -v
+pytest tests/unit/test_recovery.py -v
 
 # Skip integration tests (need real browser)
 pytest -m "not integration"
@@ -129,14 +145,14 @@ pytest -m "not integration"
 ```
 webpilot-agent/
 ├── src/
-│   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py (TODO)
+│   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py
 │   ├── browser/        # session.py, actions.py
-│   ├── checkpoints/    # manager.py (TODO)
+│   ├── checkpoints/    # manager.py
 │   ├── credentials/    # vault.py
 │   ├── api/            # server.py, routes/ (TODO)
 │   └── cli/            # main.py (TODO)
 ├── workflows/          # clerk-setup.yaml + future workflows
-├── tests/              # 105 tests passing
+├── tests/              # 169 tests passing
 ├── docs/plans/         # Implementation plan
 └── CLAUDE.md           # THIS FILE
 ```
