@@ -1,0 +1,121 @@
+# ============================================================
+# WebPilot Workflow: Clerk Authentication Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Clerk dashboard
+# 2. Creating a new application
+# 3. Configuring authentication methods (Google + Email)
+# 4. Extracting API keys
+# 5. (Future) Writing keys to .env file
+#
+# Checkpoints pause for human approval before:
+# - Creating the application
+# - Extracting sensitive API keys
+# ============================================================
+
+name: clerk-setup
+description: Set up Clerk authentication for a new project
+version: "1.0"
+tags:
+  - auth
+  - setup
+  - clerk
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  project_name: ""              # REQUIRED — user must provide
+  auth_methods: "google,email"  # default auth providers to enable
+
+credentials_required:
+  - clerk_email
+  - clerk_password
+
+steps:
+  # --- Step 1: Navigate to Clerk dashboard ---
+  - type: navigate
+    url: https://dashboard.clerk.com
+    description: Open the Clerk dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm we're logged in ---
+  - type: checkpoint
+    message: >
+      Ready to create a new Clerk application named '{{project_name}}'.
+      Please confirm you are logged in to the Clerk dashboard.
+      If not logged in, please log in manually and then approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Click "Add application" button ---
+  - type: click
+    selector: "button:has-text('Add application')"
+    description: Click the Add Application button on the Clerk dashboard
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Type the application name ---
+  - type: type
+    selector: "input[name='name'], input[placeholder*='name' i]"
+    text: "{{project_name}}"
+    description: Enter the application name in the creation form
+    fallback_strategy: llm_vision
+
+  # --- Step 6: Enable Google auth provider ---
+  - type: click
+    selector: "[data-provider='google'], button:has-text('Google')"
+    description: Enable Google as an authentication provider
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 7: Enable Email auth provider ---
+  - type: click
+    selector: "[data-provider='email'], button:has-text('Email')"
+    description: Enable Email as an authentication provider
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 8: Click Create Application ---
+  - type: click
+    selector: "button:has-text('Create application'), button[type='submit']"
+    description: Submit the application creation form
+    fallback_strategy: llm_vision
+    timeout_seconds: 15
+
+  # --- Step 9: Wait for app to be created ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for the application to be created and dashboard to update
+
+  # --- Step 10: Checkpoint — Confirm before extracting keys ---
+  - type: checkpoint
+    message: >
+      Application '{{project_name}}' has been created.
+      Ready to extract the API keys (publishable key + secret key).
+      Please confirm the application was created correctly.
+    screenshot: true
+
+  # --- Step 11: Extract publishable key ---
+  - type: extract
+    selector: "[data-copyable='publishable'], .cl-publishable-key, code:has-text('pk_')"
+    variable: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+    description: Extract the publishable API key from the Clerk dashboard
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Extract secret key ---
+  - type: extract
+    selector: "[data-copyable='secret'], .cl-secret-key, code:has-text('sk_')"
+    variable: CLERK_SECRET_KEY
+    description: Extract the secret API key from the Clerk dashboard
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Screenshot final state ---
+  - type: screenshot
+    description: Capture final dashboard state for the execution log

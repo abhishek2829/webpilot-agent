@@ -1,0 +1,95 @@
+[project]
+name = "webpilot-agent"
+version = "0.1.0"
+description = "Semi-autonomous browser agent for web workflow automation with human-in-the-loop checkpoints"
+authors = [{ name = "Abhishek Rastogi" }]
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+dependencies = [
+    # Browser automation
+    "browser-use>=0.2.0",
+    "playwright>=1.45.0",
+    
+    # LLM
+    "anthropic>=0.40.0",
+    
+    # API layer
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "websockets>=13.0",
+    
+    # Database
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.30.0",
+    "alembic>=1.13.0",
+    
+    # Queue + cache
+    "redis>=5.0.0",
+    "celery>=5.4.0",
+    
+    # Core utilities
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "pyyaml>=6.0.0",
+    "cryptography>=43.0.0",
+    "python-dotenv>=1.0.0",
+    
+    # CLI
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+    
+    # Logging
+    "structlog>=24.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "pytest-playwright>=0.5.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+    "pre-commit>=3.8.0",
+]
+
+[project.scripts]
+webpilot = "src.cli.main:app"
+
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "C4", "SIM", "TCH"]
+ignore = ["S101"]  # allow assert in tests
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests requiring browser (deselect with '-m not integration')",
+    "e2e: marks end-to-end tests against real services",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
