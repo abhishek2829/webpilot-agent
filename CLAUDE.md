@@ -29,14 +29,14 @@
 - Task 9: Workflow executor (`src/core/executor.py`) — Central loop: step iteration, checkpoint delegation, variable extraction, recovery delegation, 16 tests
 - Task 10: Recovery engine (`src/core/recovery.py`) — Three-tier: retry → LLM adapt → escalate to checkpoint, 16 tests
 
-**Total: 10/17 tasks complete, 169 tests passing**
+**Sprint 4: Interfaces — COMPLETE (3/3 tasks, 39 tests)**
+- Task 11: CLI (`src/cli/main.py`) — Typer CLI: `webpilot run` (with --dry-run), `webpilot list`, `webpilot creds set/get/list/delete`, 16 tests
+- Task 12: FastAPI server (`src/api/server.py`) — REST API: health, list/get workflows, start executions (dry-run), 10 tests
+- Task 13: Database layer (`src/core/database.py`) — SQLAlchemy async + SQLite, execution history CRUD, 13 tests
+
+**Total: 13/17 tasks complete, 208 tests passing**
 
 ## What to Build Next
-
-**Sprint 4: Interfaces (3 tasks)**
-- Task 11: CLI (`src/cli/main.py`) — Typer CLI: `webpilot run`, `webpilot list`, `webpilot creds`
-- Task 12: FastAPI server + WebSocket checkpoints (`src/api/`)
-- Task 13: Database layer (`src/core/database.py`, `src/core/db_models.py`, alembic/)
 
 **Sprint 5: Production Hardening (4 tasks)**
 - Task 14: Celery + Redis async queue
@@ -110,6 +110,19 @@ This is non-negotiable. Abhishek uses this to understand how the project is bein
 | TDD discipline | test-driven-development skill | 64 tests written FIRST, then implementation — all green |
 | ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
 
+### Sprint 4: Arsenal Patterns Deployed
+
+| Pattern | Source | Where Applied |
+|---|---|---|
+| Rich CLI output | Typer + Rich | `src/cli/main.py` — Tables, panels, colored output for workflows, creds, execution results |
+| Dry-run pattern | GSD verification | `src/cli/main.py` + `src/api/server.py` — Preview workflow steps without launching browser |
+| Factory pattern | FastAPI best practices | `src/api/server.py` — `create_app()` factory for testable API instances |
+| Repository pattern | architecture-patterns skill | `src/core/database.py` — Clean async data access with SQLAlchemy |
+| SQLite→PostgreSQL swap | database-architect skill | `src/core/database.py` — Zero-setup SQLite dev, one-line swap to PostgreSQL |
+| Dependency injection | clean-code skill | CLI/API accept paths via options for testability (--workflows-dir, --vault-path) |
+| TDD discipline | test-driven-development skill | 39 tests written FIRST, then implementation — all green |
+| ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
+
 ## Code Conventions
 
 - **Async everywhere** — all browser and DB operations use async/await
@@ -135,6 +148,9 @@ pytest tests/unit/test_browser_engine.py -v
 pytest tests/unit/test_checkpoint_manager.py -v
 pytest tests/unit/test_executor.py -v
 pytest tests/unit/test_recovery.py -v
+pytest tests/unit/test_cli.py -v
+pytest tests/unit/test_api.py -v
+pytest tests/unit/test_database.py -v
 
 # Skip integration tests (need real browser)
 pytest -m "not integration"
@@ -145,14 +161,14 @@ pytest -m "not integration"
 ```
 webpilot-agent/
 ├── src/
-│   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py
+│   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py, database.py
 │   ├── browser/        # session.py, actions.py
 │   ├── checkpoints/    # manager.py
 │   ├── credentials/    # vault.py
-│   ├── api/            # server.py, routes/ (TODO)
-│   └── cli/            # main.py (TODO)
+│   ├── api/            # server.py
+│   └── cli/            # main.py
 ├── workflows/          # clerk-setup.yaml + future workflows
-├── tests/              # 169 tests passing
+├── tests/              # 208 tests passing
 ├── docs/plans/         # Implementation plan
 └── CLAUDE.md           # THIS FILE
 ```
