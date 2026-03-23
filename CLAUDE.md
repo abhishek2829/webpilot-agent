@@ -50,12 +50,24 @@
 
 **Grand total: 21/21 tasks complete, 392+ tests, 6 workflows**
 
+**Phase 5: Multi-Agent System Integration — COMPLETE (6/6 tasks, 54 tests)**
+- Task 22: BaseAgent protocol + AgentRegistry (`src/agents/base.py`) — Protocol with capabilities, status, actions; registry with discovery and search
+- Task 23: DevOpsSetupAgent (`src/agents/devops_setup.py`) — First concrete agent wrapping the WebPilot executor, handles all 6 workflows
+- Task 24: AgentDispatcher (`src/agents/dispatcher.py`) — Routes tasks to agents, stores results, tracks execution history
+- Task 25: API v2 (`src/api/server.py`) — Live execution (POST /api/executions), execution status (GET /api/executions/{id}), agent endpoints, WebSocket checkpoints, stats
+- Task 26: BrowserSessionPool (`src/browser/session_pool.py`) — Reusable session pool with lazy creation, idle cleanup, max capacity enforcement
+- Task 27: Multi-agent tests — 54 tests covering BaseAgent, AgentRegistry, DevOpsSetupAgent, AgentDispatcher, BrowserSessionPool
+
+**Grand total: 27/27 tasks complete, 446+ tests, 6 workflows, 1 agent**
+
 ## What to Build Next
 
-**Phase 5: Multi-Agent System Integration**
-- This agent becomes `DevOpsSetupAgent` in the Multi-Agent System
-- Shared infrastructure: browser session pool, credential vault, checkpoint system
-- See `docs/plans/2026-03-22-webpilot-agent.md` for full roadmap
+**Future enhancements:**
+- ResearchAgent, SalesAgent, MarketingAgent, FinanceAgent (new agent types)
+- Manager Agent (orchestrates multi-agent workflows)
+- Dashboard UI for checkpoint approvals and execution monitoring
+- PostgreSQL execution persistence (schema ready, wire to dispatcher)
+- Celery-backed agent execution for background processing
 
 **Full implementation plan:** `docs/plans/2026-03-22-webpilot-agent.md`
 
@@ -164,6 +176,21 @@ This is non-negotiable. Abhishek uses this to understand how the project is bein
 | TDD discipline | test-driven-development skill | 114 tests written FIRST, then implementation — all green |
 | ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
 
+### Phase 5: Arsenal Patterns Deployed
+
+| Pattern | Source | Where Applied |
+|---|---|---|
+| Protocol pattern | Python Protocols (PEP 544) | `src/agents/base.py` — BaseAgent protocol with runtime_checkable, structural subtyping |
+| Registry pattern | architecture-patterns skill | `src/agents/base.py` AgentRegistry — discover, register, search agents by capability/action |
+| Dispatcher pattern | message-broker patterns | `src/agents/dispatcher.py` — Routes tasks to agents, stores results, tracks history |
+| Adapter/Wrapper pattern | design-patterns skill | `src/agents/devops_setup.py` — Wraps WorkflowExecutor into BaseAgent protocol |
+| Object pool pattern | resource-management patterns | `src/browser/session_pool.py` — Reusable browser sessions with max capacity and idle cleanup |
+| Factory pattern | FastAPI best practices | `src/api/server.py` — `create_app()` wires agents, dispatcher, registry |
+| Capability-based routing | multi-agent patterns | `src/agents/base.py` — AgentCapability enum, find_by_capability(), find_for_action() |
+| Compound-engineering | EveryInc/compound-engineering-plugin | All new components: get_stats(), get_lessons() on Agent, Dispatcher, SessionPool |
+| TDD discipline | test-driven-development skill | 54 tests written FIRST, then implementation — all green |
+| ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
+
 ## Code Conventions
 
 - **Async everywhere** — all browser and DB operations use async/await
@@ -205,6 +232,9 @@ pytest tests/unit/test_action_engine_mock.py -v
 pytest tests/unit/test_workflow_library.py -v
 pytest tests/unit/test_celery_queue.py -v
 
+# Phase 5 tests
+pytest tests/unit/test_agent_system.py -v
+
 # Skip integration tests (need real browser)
 pytest -m "not integration"
 ```
@@ -227,17 +257,18 @@ celery -A src.tasks.celery_app worker --loglevel=info -Q workflows
 ```
 webpilot-agent/
 ├── src/
+│   ├── agents/         # base.py (BaseAgent, AgentRegistry), devops_setup.py (DevOpsSetupAgent), dispatcher.py (AgentDispatcher)
 │   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py, database.py, logging.py
-│   ├── browser/        # session.py, actions.py
+│   ├── browser/        # session.py, actions.py, session_pool.py (BrowserSessionPool)
 │   ├── checkpoints/    # manager.py
 │   ├── credentials/    # vault.py
-│   ├── api/            # server.py
+│   ├── api/            # server.py (REST + WebSocket + agent endpoints)
 │   ├── cli/            # main.py
 │   ├── security/       # middleware.py (API key auth, rate limiting, input sanitization, security headers)
 │   └── tasks/          # queue.py, celery_app.py, celery_queue.py, worker.py
 ├── workflows/          # 6 YAML workflows: clerk-setup, vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup
 ├── alembic/            # Database migrations (async-compatible)
-├── tests/              # 392+ tests passing
+├── tests/              # 446+ tests passing
 ├── docs/plans/         # Implementation plan
 ├── docker-compose.yml  # PostgreSQL 16 + Redis 7
 └── CLAUDE.md           # THIS FILE
