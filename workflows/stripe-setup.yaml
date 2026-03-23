@@ -1,0 +1,165 @@
+# ============================================================
+# WebPilot Workflow: Stripe Account & API Key Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Stripe dashboard
+# 2. Creating/configuring a new account (or using existing)
+# 3. Extracting API keys (publishable + secret)
+# 4. Setting up a webhook endpoint
+#
+# Checkpoints pause for human approval before:
+# - Confirming account selection
+# - Extracting sensitive API keys
+# - Creating webhook endpoint
+# ============================================================
+
+name: stripe-setup
+description: Set up Stripe payments and extract API keys
+version: "1.0"
+tags:
+  - payments
+  - setup
+  - stripe
+  - api-keys
+estimated_duration_seconds: 240
+author: webpilot
+
+variables:
+  account_name: ""            # REQUIRED — Stripe account/business name
+  webhook_url: "none"          # endpoint URL for webhooks, or "none" to skip
+  webhook_events: "checkout.session.completed,payment_intent.succeeded"  # Default events to listen for
+
+credentials_required:
+  - stripe_email
+  - stripe_password
+
+steps:
+  # --- Step 1: Navigate to Stripe dashboard ---
+  - type: navigate
+    url: https://dashboard.stripe.com
+    description: Open the Stripe dashboard
+
+  # --- Step 2: Wait for dashboard load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Stripe dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in and account ---
+  - type: checkpoint
+    message: >
+      Ready to set up Stripe for '{{account_name}}'.
+      Please confirm you are logged in to the correct Stripe account.
+      If not logged in, please log in manually and then approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Navigate to API keys page ---
+  - type: navigate
+    url: https://dashboard.stripe.com/test/apikeys
+    description: Navigate to the API keys page (test mode)
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for API keys page to load
+
+  # --- Step 5: Checkpoint — Confirm before extracting keys ---
+  - type: checkpoint
+    message: >
+      On the Stripe API keys page (test mode).
+      Ready to extract the publishable key and secret key.
+      Please confirm this is the correct account for '{{account_name}}'.
+    screenshot: true
+
+  # --- Step 6: Extract publishable key ---
+  - type: extract
+    selector: "[data-testid='publishable-key'], code:has-text('pk_test_'), .PublishableKey"
+    variable: STRIPE_PUBLISHABLE_KEY
+    description: Extract the test publishable API key
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Reveal secret key ---
+  - type: click
+    selector: "button:has-text('Reveal test key'), button:has-text('Reveal')"
+    description: Click to reveal the secret test key
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 8: Extract secret key ---
+  - type: extract
+    selector: "[data-testid='secret-key'], code:has-text('sk_test_'), .SecretKey"
+    variable: STRIPE_SECRET_KEY
+    description: Extract the test secret API key
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Navigate to webhooks page ---
+  - type: navigate
+    url: https://dashboard.stripe.com/test/webhooks
+    description: Navigate to the webhooks configuration page
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for webhooks page to load
+
+  # --- Step 10: Checkpoint — Confirm before creating webhook ---
+  - type: checkpoint
+    message: >
+      Ready to create a webhook endpoint at '{{webhook_url}}'
+      listening for events: {{webhook_events}}.
+      Approve to proceed, or skip if no webhook is needed.
+    screenshot: true
+
+  # --- Step 11: Click "Add endpoint" ---
+  - type: click
+    selector: "a:has-text('Add endpoint'), button:has-text('Add endpoint'), a:has-text('Add an endpoint')"
+    description: Click Add endpoint to create a new webhook
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Enter webhook URL ---
+  - type: type
+    selector: "input[name='url'], input[placeholder*='endpoint' i], input[placeholder*='url' i]"
+    text: "{{webhook_url}}"
+    description: Enter the webhook endpoint URL
+    fallback_strategy: llm_vision
+
+  # --- Step 13: Select webhook events ---
+  - type: click
+    selector: "button:has-text('Select events'), button:has-text('receive all events')"
+    description: Open the event selection dialog
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 14: Click "Add endpoint" to save ---
+  - type: click
+    selector: "button:has-text('Add endpoint'), button[type='submit']"
+    description: Save the webhook endpoint configuration
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for webhook to be created
+
+  # --- Step 15: Extract webhook signing secret ---
+  - type: click
+    selector: "button:has-text('Reveal'), a:has-text('Signing secret')"
+    description: Reveal the webhook signing secret
+    fallback_strategy: llm_vision
+    optional: true
+
+  - type: extract
+    selector: "code:has-text('whsec_'), [data-testid='signing-secret']"
+    variable: STRIPE_WEBHOOK_SECRET
+    description: Extract the webhook signing secret
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 16: Screenshot final state ---
+  - type: screenshot
+    description: Capture the webhook configuration for the execution log

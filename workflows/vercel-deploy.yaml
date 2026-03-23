@@ -1,0 +1,159 @@
+# ============================================================
+# WebPilot Workflow: Vercel Project Deployment
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Vercel dashboard
+# 2. Importing a GitHub repository
+# 3. Configuring project settings (framework, env vars)
+# 4. Deploying the project
+# 5. Extracting the deployment URL
+#
+# Checkpoints pause for human approval before:
+# - Importing the repository
+# - Triggering the deployment
+# ============================================================
+
+name: vercel-deploy
+description: Import a GitHub repo into Vercel and deploy it
+version: "1.0"
+tags:
+  - deploy
+  - hosting
+  - vercel
+estimated_duration_seconds: 240
+author: webpilot
+
+variables:
+  repo_url: ""                # REQUIRED — GitHub repo URL (e.g., https://github.com/user/repo)
+  project_name: ""            # REQUIRED — Vercel project name
+  framework: "auto"            # auto-detected by Vercel if set to "auto"
+  root_directory: "."          # monorepo root dir (default: project root)
+  env_vars: "none"             # comma-separated KEY=VALUE pairs, or "none"
+
+credentials_required:
+  - vercel_email
+  - vercel_password
+
+steps:
+  # --- Step 1: Navigate to Vercel dashboard ---
+  - type: navigate
+    url: https://vercel.com/dashboard
+    description: Open the Vercel dashboard
+
+  # --- Step 2: Wait for dashboard load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Vercel dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Ready to import '{{repo_url}}' as Vercel project '{{project_name}}'.
+      Please confirm you are logged in to Vercel.
+      If not logged in, please log in manually and then approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Click "Add New" → "Project" ---
+  - type: click
+    selector: "button:has-text('Add New'), a:has-text('Add New')"
+    description: Click the Add New button on the Vercel dashboard
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  - type: click
+    selector: "a:has-text('Project'), button:has-text('Project')"
+    description: Select Project from the dropdown menu
+    fallback_strategy: llm_vision
+    timeout_seconds: 5
+
+  # --- Step 5: Import Git Repository ---
+  - type: click
+    selector: "a:has-text('Import'), button:has-text('Import')"
+    description: Click Import to start importing a Git repository
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Search/paste the repo URL ---
+  - type: type
+    selector: "input[name='url'], input[placeholder*='repository' i], input[placeholder*='search' i]"
+    text: "{{repo_url}}"
+    description: Enter the GitHub repository URL to import
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Wait for repo search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for repository search results to appear
+
+  # --- Step 8: Click Import on the matching repo ---
+  - type: click
+    selector: "button:has-text('Import')"
+    description: Click Import on the matching repository
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Set project name ---
+  - type: type
+    selector: "input[name='projectName'], input[name='project-name']"
+    text: "{{project_name}}"
+    description: Set the project name for the Vercel deployment
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 10: Set root directory (if monorepo) ---
+  - type: type
+    selector: "input[name='rootDirectory'], input[name='root-directory']"
+    text: "{{root_directory}}"
+    description: Set the root directory for monorepo projects
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 11: Checkpoint — Confirm before deploy ---
+  - type: checkpoint
+    message: >
+      Project '{{project_name}}' is configured and ready to deploy from '{{repo_url}}'.
+      Framework: {{framework}} (auto-detected if blank).
+      Please review the configuration and approve to start deployment.
+    screenshot: true
+
+  # --- Step 12: Click Deploy ---
+  - type: click
+    selector: "button:has-text('Deploy')"
+    description: Click the Deploy button to start the deployment
+    fallback_strategy: llm_vision
+    timeout_seconds: 15
+
+  # --- Step 13: Wait for deployment to start ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 30
+    description: Wait for the deployment process to begin
+
+  # --- Step 14: Wait for deployment to complete ---
+  - type: wait
+    wait_for: "a[href*='.vercel.app'], .deployment-url, :has-text('Visit')"
+    timeout_seconds: 180
+    description: Wait for the deployment to complete (may take a few minutes)
+
+  # --- Step 15: Extract deployment URL ---
+  - type: extract
+    selector: "a[href*='.vercel.app'], .deployment-url"
+    variable: VERCEL_DEPLOYMENT_URL
+    description: Extract the deployed project URL
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 16: Extract project dashboard URL ---
+  - type: extract
+    selector: "a[href*='/dashboard']"
+    variable: VERCEL_PROJECT_DASHBOARD_URL
+    description: Extract the Vercel project dashboard URL
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 17: Screenshot final state ---
+  - type: screenshot
+    description: Capture the successful deployment state for the execution log

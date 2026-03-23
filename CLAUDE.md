@@ -42,13 +42,20 @@
 
 **Total: 17/17 tasks complete, 278+ tests passing, 84% coverage**
 
+**Phase 4: Workflow Library & Infrastructure — COMPLETE (4/4 tasks, 114 tests)**
+- Task 18: Workflow library — 5 pre-built YAML workflows (vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup), 100 tests
+- Task 19: PostgreSQL migration — Alembic setup with async support, initial migration (`alembic/versions/001_initial_schema.py`)
+- Task 20: Celery + Redis workers — CeleryTaskQueue implementing TaskQueue protocol, worker tasks, celery app config, 14 tests
+- Task 21: Docker Compose — PostgreSQL 16 + Redis 7 infrastructure (`docker-compose.yml`)
+
+**Grand total: 21/21 tasks complete, 392+ tests, 6 workflows**
+
 ## What to Build Next
 
-**Phase 4: Workflow Library (Post-MVP)**
-- Pre-built YAML workflows: vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup
-- PostgreSQL migration (currently SQLite for dev — one-line swap in `database.py`)
-- Celery + Redis workers (protocol ready in `src/tasks/queue.py`, swap InMemory → Celery)
-- Docker Compose for PostgreSQL + Redis infrastructure
+**Phase 5: Multi-Agent System Integration**
+- This agent becomes `DevOpsSetupAgent` in the Multi-Agent System
+- Shared infrastructure: browser session pool, credential vault, checkpoint system
+- See `docs/plans/2026-03-22-webpilot-agent.md` for full roadmap
 
 **Full implementation plan:** `docs/plans/2026-03-22-webpilot-agent.md`
 
@@ -143,6 +150,20 @@ This is non-negotiable. Abhishek uses this to understand how the project is bein
 | TDD discipline | test-driven-development skill | 135 tests written FIRST, then implementation — all green |
 | ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
 
+### Phase 4: Arsenal Patterns Deployed
+
+| Pattern | Source | Where Applied |
+|---|---|---|
+| Workflow library | YAML-first design | `workflows/` — 6 pre-built workflows (clerk-setup, vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup) |
+| Strategy pattern | architecture-patterns skill | `src/tasks/celery_queue.py` — CeleryTaskQueue implements same TaskQueue protocol as InMemoryTaskQueue |
+| Lazy imports | Python best practices | `src/tasks/celery_queue.py` — Deferred Celery imports so module works without Celery installed |
+| Compound-engineering | EveryInc/compound-engineering-plugin | `src/tasks/celery_queue.py` — `get_lessons()` tracks failure patterns |
+| Database migrations | database-architect skill | `alembic/` — Async-compatible migrations for SQLite/PostgreSQL swap |
+| Infrastructure as code | DevOps patterns | `docker-compose.yml` — PostgreSQL 16 + Redis 7 with health checks and persistent volumes |
+| Parametrized testing | test-driven-development skill | `test_workflow_library.py` — 100 tests using pytest parametrize across all 6 workflows |
+| TDD discipline | test-driven-development skill | 114 tests written FIRST, then implementation — all green |
+| ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
+
 ## Code Conventions
 
 - **Async everywhere** — all browser and DB operations use async/await
@@ -180,8 +201,25 @@ pytest tests/unit/test_config.py -v
 pytest tests/unit/test_browser_session_mock.py -v
 pytest tests/unit/test_action_engine_mock.py -v
 
+# Phase 4 tests
+pytest tests/unit/test_workflow_library.py -v
+pytest tests/unit/test_celery_queue.py -v
+
 # Skip integration tests (need real browser)
 pytest -m "not integration"
+```
+
+## Infrastructure
+
+```bash
+# Start PostgreSQL + Redis
+docker compose up -d
+
+# Run database migrations
+WEBPILOT_DATABASE_URL=postgresql+asyncpg://webpilot:webpilot@localhost:5432/webpilot alembic upgrade head
+
+# Start Celery worker
+celery -A src.tasks.celery_app worker --loglevel=info -Q workflows
 ```
 
 ## Project Structure
@@ -196,9 +234,11 @@ webpilot-agent/
 │   ├── api/            # server.py
 │   ├── cli/            # main.py
 │   ├── security/       # middleware.py (API key auth, rate limiting, input sanitization, security headers)
-│   └── tasks/          # queue.py (InMemoryTaskQueue, Celery-ready protocol)
-├── workflows/          # clerk-setup.yaml + future workflows
-├── tests/              # 278+ tests passing, 84% coverage
+│   └── tasks/          # queue.py, celery_app.py, celery_queue.py, worker.py
+├── workflows/          # 6 YAML workflows: clerk-setup, vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup
+├── alembic/            # Database migrations (async-compatible)
+├── tests/              # 392+ tests passing
 ├── docs/plans/         # Implementation plan
+├── docker-compose.yml  # PostgreSQL 16 + Redis 7
 └── CLAUDE.md           # THIS FILE
 ```

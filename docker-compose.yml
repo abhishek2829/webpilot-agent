@@ -1,0 +1,60 @@
+# ============================================================
+# WebPilot Agent — Docker Compose (Production Infrastructure)
+# ============================================================
+# Services:
+#   - PostgreSQL 16: Execution history, workflow metadata
+#   - Redis 7: Celery broker, result backend, session cache
+#
+# Usage:
+#   docker compose up -d          # Start infrastructure
+#   docker compose down           # Stop infrastructure
+#   docker compose down -v        # Stop + delete data volumes
+#
+# After starting, run migrations:
+#   WEBPILOT_DATABASE_URL=postgresql+asyncpg://webpilot:webpilot@localhost:5432/webpilot \
+#     alembic upgrade head
+#
+# Then start the API server and Celery worker:
+#   uvicorn src.api.server:app --reload
+#   celery -A src.tasks.celery_app worker --loglevel=info -Q workflows
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: webpilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: webpilot
+      POSTGRES_PASSWORD: webpilot
+      POSTGRES_DB: webpilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: webpilot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

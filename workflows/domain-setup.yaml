@@ -1,0 +1,160 @@
+# ============================================================
+# WebPilot Workflow: Custom Domain Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to the domain registrar/DNS provider
+# 2. Adding a custom domain to Vercel (or other hosting)
+# 3. Configuring DNS records
+# 4. Verifying domain ownership
+#
+# Checkpoints pause for human approval before:
+# - Adding the domain
+# - Modifying DNS records
+# - Verifying ownership
+# ============================================================
+
+name: domain-setup
+description: Configure a custom domain with DNS records on Vercel
+version: "1.0"
+tags:
+  - domain
+  - dns
+  - setup
+  - vercel
+estimated_duration_seconds: 300
+author: webpilot
+
+variables:
+  domain: ""                  # REQUIRED — domain name (e.g., myapp.com)
+  vercel_project: ""          # REQUIRED — Vercel project to attach domain to
+  subdomain: "www"             # subdomain (e.g., www, api)
+  redirect_www: "true"        # Redirect www → apex domain
+
+credentials_required:
+  - vercel_email
+  - vercel_password
+
+steps:
+  # --- Step 1: Navigate to Vercel project settings ---
+  - type: navigate
+    url: https://vercel.com/dashboard
+    description: Open the Vercel dashboard
+
+  # --- Step 2: Wait for dashboard load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Vercel dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Ready to configure custom domain '{{domain}}' for Vercel project '{{vercel_project}}'.
+      Please confirm you are logged in to Vercel.
+      If not logged in, please log in manually and then approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Navigate to project ---
+  - type: click
+    selector: "a:has-text('{{vercel_project}}'), [data-testid='project-link']:has-text('{{vercel_project}}')"
+    description: Click on the target Vercel project
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Go to project settings ---
+  - type: click
+    selector: "a:has-text('Settings'), [href*='settings']"
+    description: Navigate to project settings
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Go to Domains tab ---
+  - type: click
+    selector: "a:has-text('Domains'), [href*='domains']"
+    description: Navigate to the Domains settings tab
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for domains settings to load
+
+  # --- Step 7: Enter domain name ---
+  - type: type
+    selector: "input[name='domain'], input[placeholder*='domain' i], input[placeholder*='example.com' i]"
+    text: "{{domain}}"
+    description: Enter the custom domain name
+    fallback_strategy: llm_vision
+
+  # --- Step 8: Click "Add" ---
+  - type: click
+    selector: "button:has-text('Add'), button[type='submit']"
+    description: Add the custom domain to the project
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for domain to be added
+
+  # --- Step 9: Checkpoint — DNS configuration required ---
+  - type: checkpoint
+    message: >
+      Domain '{{domain}}' has been added to project '{{vercel_project}}'.
+      Vercel will show the required DNS records.
+      Please review the DNS records shown on screen.
+      You will need to add these records at your domain registrar.
+      Take note of the records, then approve to continue.
+    screenshot: true
+
+  # --- Step 10: Extract DNS record type ---
+  - type: extract
+    selector: ".dns-record-type, [data-testid='record-type'], td:first-child"
+    variable: DNS_RECORD_TYPE
+    description: Extract the required DNS record type (A, CNAME, etc.)
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Extract DNS record value ---
+  - type: extract
+    selector: ".dns-record-value, [data-testid='record-value'], code"
+    variable: DNS_RECORD_VALUE
+    description: Extract the required DNS record value
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Checkpoint — Wait for DNS propagation ---
+  - type: checkpoint
+    message: >
+      DNS records needed for '{{domain}}':
+      Type: {{DNS_RECORD_TYPE}}, Value: {{DNS_RECORD_VALUE}}.
+      Please add these records at your domain registrar and wait for DNS propagation.
+      This can take 1-48 hours. Approve once DNS records have been configured.
+    screenshot: true
+
+  # --- Step 13: Click verify/refresh ---
+  - type: click
+    selector: "button:has-text('Refresh'), button:has-text('Verify'), button:has-text('Check')"
+    description: Click to verify domain DNS configuration
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for domain verification check
+
+  # --- Step 14: Checkpoint — Confirm verification result ---
+  - type: checkpoint
+    message: >
+      Domain verification check completed for '{{domain}}'.
+      Please review the verification status on screen.
+      If verified successfully, approve to finalize.
+      If not yet verified, you may need to wait longer for DNS propagation.
+    screenshot: true
+
+  # --- Step 15: Screenshot final state ---
+  - type: screenshot
+    description: Capture the domain configuration state for the execution log

@@ -1,0 +1,172 @@
+# ============================================================
+# WebPilot Workflow: Supabase Project Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Supabase dashboard
+# 2. Creating a new project
+# 3. Waiting for project provisioning
+# 4. Extracting API keys (anon key, service role key, URL)
+#
+# Checkpoints pause for human approval before:
+# - Creating the project
+# - Extracting API keys
+# ============================================================
+
+name: supabase-setup
+description: Create a new Supabase project and extract API keys
+version: "1.0"
+tags:
+  - database
+  - setup
+  - supabase
+  - backend
+estimated_duration_seconds: 300
+author: webpilot
+
+variables:
+  project_name: ""            # REQUIRED — Supabase project name
+  organization: "default"      # org to create project under
+  database_password: ""       # REQUIRED — password for the Postgres database
+  region: "us-east-1"         # Default AWS region
+  pricing_plan: "free"        # free or pro
+
+credentials_required:
+  - supabase_email
+  - supabase_password
+
+steps:
+  # --- Step 1: Navigate to Supabase dashboard ---
+  - type: navigate
+    url: https://supabase.com/dashboard/projects
+    description: Open the Supabase dashboard
+
+  # --- Step 2: Wait for dashboard load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Supabase dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Ready to create a new Supabase project named '{{project_name}}'.
+      Region: {{region}}, Plan: {{pricing_plan}}.
+      Please confirm you are logged in to Supabase.
+      If not logged in, please log in manually and then approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Click "New Project" ---
+  - type: click
+    selector: "a:has-text('New Project'), button:has-text('New Project'), a:has-text('New project')"
+    description: Click the New Project button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Select organization (if applicable) ---
+  - type: click
+    selector: "button:has-text('{{organization}}'), [data-org-name='{{organization}}']"
+    description: Select the organization for the new project
+    fallback_strategy: llm_vision
+    optional: true
+    timeout_seconds: 5
+
+  # --- Step 6: Enter project name ---
+  - type: type
+    selector: "input[name='name'], input[id='project-name'], input[placeholder*='name' i]"
+    text: "{{project_name}}"
+    description: Enter the project name
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Enter database password ---
+  - type: type
+    selector: "input[name='dbPass'], input[type='password'], input[id='db-password']"
+    text: "{{database_password}}"
+    description: Enter the database password
+    fallback_strategy: llm_vision
+
+  # --- Step 8: Select region ---
+  - type: click
+    selector: "button:has-text('{{region}}'), [data-region='{{region}}']"
+    description: Select the AWS region for the project
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 9: Select pricing plan ---
+  - type: click
+    selector: "button:has-text('Free'), [data-plan='{{pricing_plan}}']"
+    description: Select the pricing plan
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 10: Checkpoint — Confirm before creating ---
+  - type: checkpoint
+    message: >
+      About to create Supabase project '{{project_name}}' in region '{{region}}'
+      on the '{{pricing_plan}}' plan. This will provision a new PostgreSQL database.
+      Please review and approve.
+    screenshot: true
+
+  # --- Step 11: Click "Create new project" ---
+  - type: click
+    selector: "button:has-text('Create new project'), button[type='submit']"
+    description: Submit the project creation form
+    fallback_strategy: llm_vision
+    timeout_seconds: 15
+
+  # --- Step 12: Wait for project provisioning ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 120
+    description: Wait for the Supabase project to be provisioned (can take 1-2 minutes)
+
+  # --- Step 13: Navigate to API settings ---
+  - type: navigate
+    url: https://supabase.com/dashboard/project/_/settings/api
+    description: Navigate to the API settings page to find keys
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for API settings page to load
+
+  # --- Step 14: Checkpoint — Confirm before extracting keys ---
+  - type: checkpoint
+    message: >
+      Project '{{project_name}}' has been provisioned.
+      Ready to extract the API keys (URL, anon key, service role key).
+      Please confirm the project was created correctly.
+    screenshot: true
+
+  # --- Step 15: Extract project URL ---
+  - type: extract
+    selector: "input[id='apiURL'], [data-key='url'], code:has-text('supabase.co')"
+    variable: SUPABASE_URL
+    description: Extract the Supabase project URL
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 16: Extract anon/public key ---
+  - type: extract
+    selector: "input[id='anonKey'], [data-key='anon'], code:has-text('eyJ')"
+    variable: SUPABASE_ANON_KEY
+    description: Extract the anon (public) API key
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 17: Reveal and extract service role key ---
+  - type: click
+    selector: "button:has-text('Reveal'), button[aria-label*='reveal' i]"
+    description: Click to reveal the service role key
+    fallback_strategy: llm_vision
+    optional: true
+
+  - type: extract
+    selector: "input[id='serviceRoleKey'], [data-key='service_role']"
+    variable: SUPABASE_SERVICE_ROLE_KEY
+    description: Extract the service role (secret) API key
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 18: Screenshot final state ---
+  - type: screenshot
+    description: Capture the API settings page for the execution log

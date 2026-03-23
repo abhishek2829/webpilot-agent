@@ -1,0 +1,168 @@
+# ============================================================
+# WebPilot Workflow: GitHub Repository Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to GitHub
+# 2. Creating a new repository
+# 3. Configuring repository settings (description, visibility, etc.)
+# 4. Adding repository secrets for CI/CD
+#
+# Checkpoints pause for human approval before:
+# - Creating the repository
+# - Adding secrets
+# ============================================================
+
+name: github-repo
+description: Create a new GitHub repository and configure settings
+version: "1.0"
+tags:
+  - git
+  - setup
+  - github
+  - repository
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  repo_name: ""               # REQUIRED — repository name
+  github_username: ""          # REQUIRED — GitHub username or org name
+  repo_description: "Created by WebPilot Agent"  # repository description
+  visibility: "private"       # public or private
+  add_readme: "true"          # Initialize with README
+  gitignore_template: "Node"  # .gitignore template (Node, Python, etc.)
+  license: "MIT"              # license template (MIT, Apache-2.0, etc.)
+  secrets: "none"             # comma-separated KEY=VALUE pairs, or "none"
+
+credentials_required:
+  - github_email
+  - github_password
+
+steps:
+  # --- Step 1: Navigate to GitHub new repo page ---
+  - type: navigate
+    url: https://github.com/new
+    description: Open the GitHub new repository page
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the new repository form to load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Ready to create a new GitHub repository '{{repo_name}}'.
+      Visibility: {{visibility}}, .gitignore: {{gitignore_template}}.
+      Please confirm you are logged in to GitHub.
+      If not logged in, please log in manually and then approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Enter repository name ---
+  - type: type
+    selector: "input[name='repository[name]'], input#repository_name, input[aria-label*='Repository name' i]"
+    text: "{{repo_name}}"
+    description: Enter the repository name
+    fallback_strategy: llm_vision
+
+  # --- Step 5: Enter description ---
+  - type: type
+    selector: "input[name='repository[description]'], input#repository_description, input[aria-label*='Description' i]"
+    text: "{{repo_description}}"
+    description: Enter the repository description
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 6: Set visibility ---
+  - type: click
+    selector: "input[value='{{visibility}}'], label:has-text('{{visibility}}')"
+    description: Set repository visibility to {{visibility}}
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Initialize with README ---
+  - type: click
+    selector: "input[name='repository[auto_init]'], input#repository_auto_init, label:has-text('Add a README')"
+    description: Check the box to initialize with a README file
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 8: Select .gitignore template ---
+  - type: click
+    selector: "details summary:has-text('.gitignore'), button:has-text('.gitignore')"
+    description: Open the .gitignore template selector
+    fallback_strategy: llm_vision
+    optional: true
+
+  - type: click
+    selector: "span:has-text('{{gitignore_template}}'), [data-value='{{gitignore_template}}']"
+    description: Select the {{gitignore_template}} .gitignore template
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 9: Select license ---
+  - type: click
+    selector: "details summary:has-text('License'), button:has-text('License')"
+    description: Open the license selector
+    fallback_strategy: llm_vision
+    optional: true
+
+  - type: click
+    selector: "span:has-text('{{license}}'), [data-value='{{license}}']"
+    description: Select the {{license}} license
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 10: Checkpoint — Confirm before creating ---
+  - type: checkpoint
+    message: >
+      About to create repository '{{repo_name}}' ({{visibility}}).
+      Description: {{repo_description}}
+      .gitignore: {{gitignore_template}}, License: {{license}}.
+      Please review the configuration and approve.
+    screenshot: true
+
+  # --- Step 11: Click "Create repository" ---
+  - type: click
+    selector: "button:has-text('Create repository'), button[type='submit']:has-text('Create')"
+    description: Click Create repository to finalize
+    fallback_strategy: llm_vision
+    timeout_seconds: 15
+
+  # --- Step 12: Wait for repo to be created ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for the repository to be created and page to redirect
+
+  # --- Step 13: Extract repository URL ---
+  - type: extract
+    selector: "input[value*='github.com'], .js-live-clone-url, [data-autoselect]"
+    variable: GITHUB_REPO_URL
+    description: Extract the repository clone URL
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 14: Navigate to secrets settings ---
+  - type: navigate
+    url: https://github.com/{{github_username}}/{{repo_name}}/settings/secrets/actions
+    description: Navigate to repository secrets settings for CI/CD
+    optional: true
+
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for secrets settings page to load
+    optional: true
+
+  # --- Step 15: Checkpoint — Confirm before adding secrets ---
+  - type: checkpoint
+    message: >
+      Repository '{{repo_name}}' has been created.
+      Ready to add repository secrets for CI/CD: {{secrets}}.
+      Approve to add secrets, or skip if none are needed.
+    screenshot: true
+
+  # --- Step 16: Screenshot final state ---
+  - type: screenshot
+    description: Capture the repository page for the execution log
