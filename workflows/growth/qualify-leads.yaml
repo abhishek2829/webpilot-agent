@@ -1,0 +1,146 @@
+# ============================================================
+# WebPilot Workflow: Qualify Leads
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a lead's profile on LinkedIn
+# 2. Extracting role, company, and recent activity
+# 3. Producing a qualification summary with fit score
+#
+# Checkpoints pause for human approval before:
+# - Confirming the correct profile was loaded
+# - Reviewing the final qualification assessment
+# ============================================================
+
+name: qualify-leads
+description: Research a lead to determine if they are a good fit based on role, company size, and pain points
+version: "1.0"
+tags:
+  - growth
+  - qualification
+  - research
+estimated_duration_seconds: 240
+author: webpilot
+
+variables:
+  lead_url: ""                                              # REQUIRED — user must provide
+  lead_platform: "linkedin"                                 # default platform for lead research
+
+credentials_required:
+  - linkedin_email
+  - linkedin_password
+
+steps:
+  # --- Step 1: Navigate to LinkedIn login ---
+  - type: navigate
+    url: https://www.linkedin.com/login
+    description: Open LinkedIn login page
+
+  # --- Step 2: Type email ---
+  - type: type
+    selector: "input#username, input[name='session_key']"
+    text: "{{linkedin_email}}"
+    description: Enter LinkedIn email address
+    fallback_strategy: llm_vision
+
+  # --- Step 3: Type password ---
+  - type: type
+    selector: "input#password, input[name='session_password']"
+    text: "{{linkedin_password}}"
+    description: Enter LinkedIn password
+    fallback_strategy: llm_vision
+
+  # --- Step 4: Click sign in ---
+  - type: click
+    selector: "button[type='submit'], button:has-text('Sign in')"
+    description: Click the Sign In button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for login ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for LinkedIn to load after login
+
+  # --- Step 6: Navigate to lead profile ---
+  - type: navigate
+    url: "{{lead_url}}"
+    description: Open the lead's LinkedIn profile
+
+  # --- Step 7: Wait for profile to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the lead profile to fully load
+
+  # --- Step 8: Checkpoint — Confirm correct profile ---
+  - type: checkpoint
+    message: >
+      Navigated to lead profile: '{{lead_url}}'.
+      Please confirm this is the correct person before proceeding with qualification.
+    screenshot: true
+
+  # --- Step 9: Extract lead name ---
+  - type: extract
+    selector: "h1.text-heading-xlarge, .pv-text-details__left-panel h1"
+    variable: LEAD_NAME
+    description: Extract the lead's full name
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Extract lead role ---
+  - type: extract
+    selector: ".text-body-medium.break-words, .pv-text-details__left-panel .text-body-medium"
+    variable: LEAD_ROLE
+    description: Extract the lead's current job title
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Extract company name ---
+  - type: extract
+    selector: ".pv-text-details__right-panel a[href*='/company/'], .experience-item .pv-entity__secondary-title, button[aria-label*='company']"
+    variable: COMPANY_NAME
+    description: Extract the lead's current company name
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Extract company size ---
+  - type: extract
+    selector: ".org-top-card-summary-info-list__info-item, .pv-entity__description, [class*='company-size']"
+    variable: COMPANY_SIZE
+    description: Extract the company size or employee count
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 13: Extract lead score ---
+  - type: extract
+    selector: ".pv-about-section .pv-about__summary-text, #about ~ div .display-flex span[aria-hidden='true']"
+    variable: LEAD_SCORE
+    description: Extract the lead's about section to assess pain points and fit
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 14: Extract fit assessment ---
+  - type: extract
+    selector: ".pvs-list__outer-container .artdeco-list__item, .experience-section li, #experience ~ div .display-flex"
+    variable: FIT_ASSESSMENT
+    description: Extract recent experience and activity to build a fit assessment
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 15: Checkpoint — Review qualification ---
+  - type: checkpoint
+    message: >
+      Lead qualification summary:
+      - Name: {{LEAD_NAME}}
+      - Role: {{LEAD_ROLE}}
+      - Company: {{COMPANY_NAME}}
+      - Company Size: {{COMPANY_SIZE}}
+      Please review the qualification details and confirm.
+    screenshot: true
+
+  # --- Step 16: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of lead qualification workflow for the execution log

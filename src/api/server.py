@@ -37,6 +37,7 @@ from src.agents.base import AgentRegistry, AgentTask
 from src.agents.devops_setup import DevOpsSetupAgent
 from src.agents.dispatcher import AgentDispatcher, DispatchError
 from src.agents.finance import FinanceAgent
+from src.agents.growth import GrowthAgent
 from src.agents.manager import ManagerAgent
 from src.agents.marketing import MarketingAgent
 from src.agents.research import ResearchAgent
@@ -139,6 +140,7 @@ def create_app(workflows_dir: Path | None = None) -> FastAPI:
     agent_registry.register(SalesAgent())
     agent_registry.register(MarketingAgent())
     agent_registry.register(FinanceAgent())
+    agent_registry.register(GrowthAgent())
 
     dispatcher = AgentDispatcher(registry=agent_registry)
 

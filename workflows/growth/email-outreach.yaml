@@ -1,0 +1,134 @@
+# ============================================================
+# WebPilot Workflow: Email Outreach
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to an email platform (Gmail by default)
+# 2. Composing a cold email from sequence templates
+# 3. Filling subject and body based on lead_type and step
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to the email platform
+# - Sending the composed email
+# ============================================================
+
+name: email-outreach
+description: Send a cold email using pre-built email sequences based on lead type and sequence step
+version: "1.0"
+tags:
+  - growth
+  - outreach
+  - email
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  recipient_email: ""                                       # REQUIRED — user must provide
+  recipient_name: ""                                        # REQUIRED — user must provide
+  lead_type: "startup_cto"                                  # default lead persona for template
+  sequence_step: "1"                                        # which step in the email sequence
+  email_platform: "https://mail.google.com"                 # default email platform
+
+credentials_required:
+  - email_account_email
+  - email_account_password
+
+steps:
+  # --- Step 1: Navigate to email platform ---
+  - type: navigate
+    url: "{{email_platform}}"
+    description: Open the email platform
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the email platform to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Email platform is open at '{{email_platform}}'.
+      Please confirm you are logged in. If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Click Compose ---
+  - type: click
+    selector: ".T-I.T-I-KE.L3, button:has-text('Compose'), [gh='cm']"
+    description: Click Compose to start a new email
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for compose window ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for the compose window to appear
+
+  # --- Step 6: Type recipient email ---
+  - type: type
+    selector: "input[name='to'], textarea[name='to'], [aria-label='To recipients'], input[aria-label*='To']"
+    text: "{{recipient_email}}"
+    description: Enter the recipient's email address
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Type subject line ---
+  - type: type
+    selector: "input[name='subjectbox'], input[placeholder='Subject'], input[aria-label='Subject']"
+    text: "Quick question for {{recipient_name}} - step {{sequence_step}}"
+    description: Fill in the email subject line from the sequence template
+    fallback_strategy: llm_vision
+
+  # --- Step 8: Extract subject line ---
+  - type: extract
+    selector: "input[name='subjectbox'], input[placeholder='Subject'], input[aria-label='Subject']"
+    variable: SUBJECT_LINE
+    description: Capture the subject line that was entered
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Type email body ---
+  - type: type
+    selector: "[role='textbox'][aria-label*='Message Body'], .Am.Al.editable, [contenteditable='true'][aria-label*='Body']"
+    text: "Hi {{recipient_name}},\n\nI noticed you're building something interesting and wanted to reach out.\n\nWe help {{lead_type}} teams automate their repetitive setup and outreach tasks so they can focus on building.\n\nWould you be open to a quick 15-min chat this week?\n\nBest regards"
+    description: Type the email body content from the sequence template
+    fallback_strategy: llm_vision
+
+  # --- Step 10: Screenshot composed email ---
+  - type: screenshot
+    description: Capture the fully composed email before sending
+
+  # --- Step 11: Checkpoint — Review before sending ---
+  - type: checkpoint
+    message: >
+      Email composed and ready to send:
+      - To: {{recipient_email}} ({{recipient_name}})
+      - Subject: {{SUBJECT_LINE}}
+      - Lead type: {{lead_type}}, Sequence step: {{sequence_step}}
+      Please review the email content and confirm before sending.
+    screenshot: true
+
+  # --- Step 12: Click Send ---
+  - type: click
+    selector: "[aria-label*='Send'], .T-I.J-J5-Ji[role='button'], button:has-text('Send')"
+    description: Click the Send button to deliver the email
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Wait for send confirmation ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for the email to be sent
+
+  # --- Step 14: Extract email status ---
+  - type: extract
+    selector: ".bAq .aH2, [data-tooltip='Undo'], .vh[aria-live='assertive'], span:has-text('Message sent')"
+    variable: EMAIL_STATUS
+    description: Capture the email send confirmation status
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 15: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of email outreach workflow for the execution log

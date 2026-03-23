@@ -150,6 +150,45 @@ BUILTIN_PIPELINES: dict[str, Pipeline] = {
             PipelineStep(action="subscription-audit", agent_name="auto"),
         ],
     ),
+    "lead-gen-pipeline": Pipeline(
+        name="lead-gen-pipeline",
+        description="Find hot leads on social platforms, qualify them, add to pipeline",
+        steps=[
+            PipelineStep(action="find-hot-leads", agent_name="growth", parameters={"platform": "twitter"}),
+            PipelineStep(action="qualify-leads", agent_name="growth", input_mapping={"lead_url": "step_0.TOP_LEADS"}),
+            PipelineStep(action="track-pipeline", agent_name="growth"),
+        ],
+    ),
+    "nurture-convert-pipeline": Pipeline(
+        name="nurture-convert-pipeline",
+        description="Run outreach on qualified leads: LinkedIn connect, email follow-up, track results",
+        steps=[
+            PipelineStep(action="linkedin-outreach", agent_name="growth"),
+            PipelineStep(action="email-outreach", agent_name="growth", input_mapping={"recipient_name": "step_0.PROSPECT_NAME"}),
+            PipelineStep(action="track-pipeline", agent_name="growth"),
+        ],
+    ),
+    "content-distribute-pipeline": Pipeline(
+        name="content-distribute-pipeline",
+        description="Post content across all channels: Twitter thread, LinkedIn post, then track engagement",
+        steps=[
+            PipelineStep(action="post-content", agent_name="growth", parameters={"platform": "twitter", "content_type": "thread"}),
+            PipelineStep(action="post-content", agent_name="growth", parameters={"platform": "linkedin", "content_type": "post"}),
+            PipelineStep(action="track-pipeline", agent_name="growth"),
+        ],
+    ),
+    "weekly-growth-cycle": Pipeline(
+        name="weekly-growth-cycle",
+        description="Complete weekly growth cycle: find leads, qualify, outreach, post content, track pipeline",
+        steps=[
+            PipelineStep(action="find-hot-leads", agent_name="growth", parameters={"platform": "twitter"}),
+            PipelineStep(action="qualify-leads", agent_name="growth", input_mapping={"lead_url": "step_0.TOP_LEADS"}),
+            PipelineStep(action="linkedin-outreach", agent_name="growth"),
+            PipelineStep(action="email-outreach", agent_name="growth"),
+            PipelineStep(action="post-content", agent_name="growth", parameters={"platform": "twitter"}),
+            PipelineStep(action="track-pipeline", agent_name="growth"),
+        ],
+    ),
 }
 
 

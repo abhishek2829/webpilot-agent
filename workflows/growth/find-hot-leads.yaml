@@ -1,0 +1,130 @@
+# ============================================================
+# WebPilot Workflow: Find Hot Leads
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Twitter/X advanced search
+# 2. Searching for pain-point keywords about setup and outreach
+# 3. Extracting profile URLs, names, and tweet content
+#
+# Checkpoints pause for human approval before:
+# - Confirming search results are relevant
+# - Reviewing the final list of extracted leads
+# ============================================================
+
+name: find-hot-leads
+description: Find potential customers on social platforms complaining about repetitive setup, manual research, or tedious outreach
+version: "1.0"
+tags:
+  - growth
+  - leads
+  - prospecting
+estimated_duration_seconds: 300
+author: webpilot
+
+variables:
+  platform: "twitter"                                       # default platform to search
+  search_queries: ""                                        # REQUIRED — user must provide
+  max_results: "10"                                         # max number of leads to extract
+
+credentials_required:
+  - twitter_email
+  - twitter_password
+
+steps:
+  # --- Step 1: Navigate to Twitter login ---
+  - type: navigate
+    url: https://twitter.com/i/flow/login
+    description: Open Twitter/X login page
+
+  # --- Step 2: Type email ---
+  - type: type
+    selector: "input[autocomplete='username'], input[name='text'], input[type='text']"
+    text: "{{twitter_email}}"
+    description: Enter Twitter email address
+    fallback_strategy: llm_vision
+
+  # --- Step 3: Click Next ---
+  - type: click
+    selector: "button:has-text('Next'), [role='button']:has-text('Next')"
+    description: Click Next to proceed to password
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 4: Type password ---
+  - type: type
+    selector: "input[name='password'], input[type='password']"
+    text: "{{twitter_password}}"
+    description: Enter Twitter password
+    fallback_strategy: llm_vision
+
+  # --- Step 5: Click Log in ---
+  - type: click
+    selector: "button:has-text('Log in'), [data-testid='LoginForm_Login_Button']"
+    description: Click Log in button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Wait for login ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Twitter feed to load after login
+
+  # --- Step 7: Navigate to search ---
+  - type: navigate
+    url: "https://twitter.com/search?q={{search_queries}}&src=typed_query&f=latest"
+    description: Open Twitter search with pain-point keywords
+
+  # --- Step 8: Wait for search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for search results to load
+
+  # --- Step 9: Checkpoint — Review search results ---
+  - type: checkpoint
+    message: >
+      Twitter search results loaded for: '{{search_queries}}'.
+      Please review and confirm the results look relevant before extracting leads.
+    screenshot: true
+
+  # --- Step 10: Extract lead count ---
+  - type: extract
+    selector: "[data-testid='tweet'], article[role='article']"
+    variable: LEAD_COUNT
+    description: Count the number of matching tweets found
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Extract lead profiles ---
+  - type: extract
+    selector: "[data-testid='tweet'] a[role='link'][href*='/'], article [data-testid='User-Name'] a"
+    variable: LEAD_PROFILES
+    description: Extract profile URLs and usernames from matching tweets
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Extract top leads with tweet content ---
+  - type: extract
+    selector: "[data-testid='tweetText'], article [lang]"
+    variable: TOP_LEADS
+    description: Extract tweet text content to identify the strongest pain-point signals
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Screenshot search results ---
+  - type: screenshot
+    description: Capture the search results page with extracted leads
+
+  # --- Step 14: Checkpoint — Review extracted leads ---
+  - type: checkpoint
+    message: >
+      Extracted leads from Twitter search.
+      Found approximately {{LEAD_COUNT}} results.
+      Top leads and their tweets have been captured.
+      Please review before finalizing.
+    screenshot: true
+
+  # --- Step 15: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of lead discovery workflow for the execution log

@@ -1,0 +1,141 @@
+# ============================================================
+# WebPilot Workflow: LinkedIn Outreach
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a prospect's LinkedIn profile
+# 2. Sending a personalized connection request with note
+# 3. Using lead_type templates for personalization
+#
+# Checkpoints pause for human approval before:
+# - Confirming the correct prospect profile
+# - Sending the connection request
+# ============================================================
+
+name: linkedin-outreach
+description: Send a LinkedIn connection request with personalized note using pre-built templates
+version: "1.0"
+tags:
+  - growth
+  - outreach
+  - linkedin
+estimated_duration_seconds: 150
+author: webpilot
+
+variables:
+  prospect_url: ""                                          # REQUIRED — user must provide
+  lead_type: "startup_cto"                                  # default lead persona template
+  connection_note: "auto"                                   # auto generates from lead_type template
+
+credentials_required:
+  - linkedin_email
+  - linkedin_password
+
+steps:
+  # --- Step 1: Navigate to LinkedIn login ---
+  - type: navigate
+    url: https://www.linkedin.com/login
+    description: Open LinkedIn login page
+
+  # --- Step 2: Type email ---
+  - type: type
+    selector: "input#username, input[name='session_key']"
+    text: "{{linkedin_email}}"
+    description: Enter LinkedIn email address
+    fallback_strategy: llm_vision
+
+  # --- Step 3: Type password ---
+  - type: type
+    selector: "input#password, input[name='session_password']"
+    text: "{{linkedin_password}}"
+    description: Enter LinkedIn password
+    fallback_strategy: llm_vision
+
+  # --- Step 4: Click sign in ---
+  - type: click
+    selector: "button[type='submit'], button:has-text('Sign in')"
+    description: Click the Sign In button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for login ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for LinkedIn to load after login
+
+  # --- Step 6: Navigate to prospect profile ---
+  - type: navigate
+    url: "{{prospect_url}}"
+    description: Open the prospect's LinkedIn profile
+
+  # --- Step 7: Wait for profile to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the prospect profile to fully load
+
+  # --- Step 8: Extract prospect name ---
+  - type: extract
+    selector: "h1.text-heading-xlarge, .pv-text-details__left-panel h1"
+    variable: PROSPECT_NAME
+    description: Extract the prospect's full name
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Extract prospect title ---
+  - type: extract
+    selector: ".text-body-medium.break-words, .pv-text-details__left-panel .text-body-medium"
+    variable: PROSPECT_TITLE
+    description: Extract the prospect's job title
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Checkpoint — Confirm correct profile ---
+  - type: checkpoint
+    message: >
+      Navigated to prospect profile: {{PROSPECT_NAME}} ({{PROSPECT_TITLE}}).
+      Lead type: '{{lead_type}}'.
+      Please confirm this is the correct person before sending a connection request.
+    screenshot: true
+
+  # --- Step 11: Click Connect button ---
+  - type: click
+    selector: "button:has-text('Connect'), .pvs-profile-actions button:has-text('Connect')"
+    description: Click the Connect button on the profile
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Click Add a note ---
+  - type: click
+    selector: "button:has-text('Add a note')"
+    description: Click Add a note to personalize the connection request
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Type connection note ---
+  - type: type
+    selector: "textarea#custom-message, textarea[name='message']"
+    text: "{{connection_note}}"
+    description: Type the personalized connection note based on lead_type template
+    fallback_strategy: llm_vision
+
+  # --- Step 14: Checkpoint — Confirm before sending ---
+  - type: checkpoint
+    message: >
+      Ready to send connection request to {{PROSPECT_NAME}} ({{PROSPECT_TITLE}}).
+      Lead type: '{{lead_type}}'.
+      Note: '{{connection_note}}'.
+      Please review and confirm before sending.
+    screenshot: true
+
+  # --- Step 15: Extract connection status ---
+  - type: extract
+    selector: "button:has-text('Pending'), .artdeco-toast-item__message, .artdeco-modal .artdeco-button--primary"
+    variable: CONNECTION_STATUS
+    description: Capture the connection request status
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 16: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of LinkedIn outreach workflow for the execution log

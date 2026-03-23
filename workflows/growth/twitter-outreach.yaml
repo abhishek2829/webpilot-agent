@@ -1,0 +1,138 @@
+# ============================================================
+# WebPilot Workflow: Twitter Outreach
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Twitter/X and finding the prospect
+# 2. Opening a DM conversation
+# 3. Sending a personalized message based on templates
+#
+# Checkpoints pause for human approval before:
+# - Confirming the correct prospect profile
+# - Sending the DM
+# ============================================================
+
+name: twitter-outreach
+description: Send a personalized DM to a lead on Twitter using pre-built templates
+version: "1.0"
+tags:
+  - growth
+  - outreach
+  - twitter
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  prospect_handle: ""                                       # REQUIRED — user must provide
+  message_template: "indie_hacker"                          # default template style
+  custom_message: "none"                                    # override with a custom message
+
+credentials_required:
+  - twitter_email
+  - twitter_password
+
+steps:
+  # --- Step 1: Navigate to Twitter login ---
+  - type: navigate
+    url: https://twitter.com/i/flow/login
+    description: Open Twitter/X login page
+
+  # --- Step 2: Type email ---
+  - type: type
+    selector: "input[autocomplete='username'], input[name='text'], input[type='text']"
+    text: "{{twitter_email}}"
+    description: Enter Twitter email address
+    fallback_strategy: llm_vision
+
+  # --- Step 3: Click Next ---
+  - type: click
+    selector: "button:has-text('Next'), [role='button']:has-text('Next')"
+    description: Click Next to proceed to password
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 4: Type password ---
+  - type: type
+    selector: "input[name='password'], input[type='password']"
+    text: "{{twitter_password}}"
+    description: Enter Twitter password
+    fallback_strategy: llm_vision
+
+  # --- Step 5: Click Log in ---
+  - type: click
+    selector: "button:has-text('Log in'), [data-testid='LoginForm_Login_Button']"
+    description: Click Log in button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Wait for login ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Twitter feed to load after login
+
+  # --- Step 7: Navigate to prospect profile ---
+  - type: navigate
+    url: "https://twitter.com/{{prospect_handle}}"
+    description: Open the prospect's Twitter profile
+
+  # --- Step 8: Wait for profile to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the prospect profile to fully load
+
+  # --- Step 9: Extract prospect name ---
+  - type: extract
+    selector: "[data-testid='UserName'] span, h2[role='heading'] span"
+    variable: PROSPECT_NAME
+    description: Extract the prospect's display name from their profile
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Checkpoint — Confirm correct profile ---
+  - type: checkpoint
+    message: >
+      Navigated to @{{prospect_handle}}'s profile ({{PROSPECT_NAME}}).
+      Template: '{{message_template}}'.
+      Please confirm this is the correct prospect before opening DM.
+    screenshot: true
+
+  # --- Step 11: Click Message/DM button ---
+  - type: click
+    selector: "[data-testid='sendDMFromProfile'], button[aria-label*='Message'], a[href*='/messages/compose']"
+    description: Click the Message button to open DM compose
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Wait for DM compose ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for the DM compose window to open
+
+  # --- Step 13: Type DM message ---
+  - type: type
+    selector: "[data-testid='dmComposerTextInput'], [role='textbox'], .DraftEditor-root [contenteditable='true']"
+    text: "{{custom_message}}"
+    description: Type the personalized DM message
+    fallback_strategy: llm_vision
+
+  # --- Step 14: Checkpoint — Confirm before sending ---
+  - type: checkpoint
+    message: >
+      Ready to send DM to {{PROSPECT_NAME}} (@{{prospect_handle}}).
+      Message template: '{{message_template}}'.
+      Please review the message content and confirm before sending.
+    screenshot: true
+
+  # --- Step 15: Extract DM status ---
+  - type: extract
+    selector: "[data-testid='dmComposerTextInput'], [role='textbox']"
+    variable: DM_STATUS
+    description: Capture the DM status (composed and ready to send)
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 16: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of Twitter outreach workflow for the execution log

@@ -1,0 +1,131 @@
+# ============================================================
+# WebPilot Workflow: Track Pipeline
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to the CRM dashboard (HubSpot by default)
+# 2. Extracting pipeline stages, deal values, and follow-ups
+# 3. Summarizing conversion metrics and next actions
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to the CRM
+# - Reviewing the pipeline status summary
+# ============================================================
+
+name: track-pipeline
+description: Check the CRM pipeline for lead status updates, follow-up reminders, and conversion metrics
+version: "1.0"
+tags:
+  - growth
+  - pipeline
+  - crm
+  - tracking
+estimated_duration_seconds: 210
+author: webpilot
+
+variables:
+  crm_url: "https://app.hubspot.com/contacts"              # default CRM dashboard URL
+  date_range: "last-7-days"                                 # date range for pipeline data
+
+credentials_required:
+  - hubspot_email
+  - hubspot_password
+
+steps:
+  # --- Step 1: Navigate to CRM login ---
+  - type: navigate
+    url: "{{crm_url}}"
+    description: Open the CRM dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the CRM platform to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      CRM dashboard is open at '{{crm_url}}'.
+      Date range: {{date_range}}.
+      Please confirm you are logged in. If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Navigate to deals pipeline ---
+  - type: navigate
+    url: "https://app.hubspot.com/contacts/deals/board/view/all"
+    description: Open the deals pipeline board view
+
+  # --- Step 5: Wait for pipeline to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the pipeline board to fully load
+
+  # --- Step 6: Extract total leads ---
+  - type: extract
+    selector: ".deals-board-column, [data-test-id='deal-board-column'], .pipeline-column-header .count, [class*='column-count']"
+    variable: TOTAL_LEADS
+    description: Extract the total number of leads across all pipeline stages
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Extract qualified count ---
+  - type: extract
+    selector: "[data-stage='qualified'] .count, .pipeline-column:nth-child(2) .column-count, [class*='qualified'] [class*='count']"
+    variable: QUALIFIED_COUNT
+    description: Extract the count of qualified leads
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 8: Extract contacted count ---
+  - type: extract
+    selector: "[data-stage='contacted'] .count, .pipeline-column:nth-child(3) .column-count, [class*='contacted'] [class*='count']"
+    variable: CONTACTED_COUNT
+    description: Extract the count of contacted leads
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Extract demos scheduled ---
+  - type: extract
+    selector: "[data-stage='demo'] .count, [class*='demo-scheduled'] [class*='count'], .pipeline-column:nth-child(4) .column-count"
+    variable: DEMOS_SCHEDULED
+    description: Extract the count of demos scheduled
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Extract deals won ---
+  - type: extract
+    selector: "[data-stage='won'] .count, [class*='closed-won'] [class*='count'], .pipeline-column:last-child .column-count"
+    variable: DEALS_WON
+    description: Extract the count of deals won
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Extract pipeline value ---
+  - type: extract
+    selector: "[class*='total-value'], .pipeline-summary [class*='amount'], [data-test-id='pipeline-total'], [class*='revenue']"
+    variable: PIPELINE_VALUE
+    description: Extract the total pipeline value in dollars
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Screenshot pipeline board ---
+  - type: screenshot
+    description: Capture the full pipeline board view
+
+  # --- Step 13: Checkpoint — Review pipeline status ---
+  - type: checkpoint
+    message: >
+      Pipeline status for {{date_range}}:
+      - Total leads: {{TOTAL_LEADS}}
+      - Qualified: {{QUALIFIED_COUNT}}
+      - Contacted: {{CONTACTED_COUNT}}
+      - Demos scheduled: {{DEMOS_SCHEDULED}}
+      - Deals won: {{DEALS_WON}}
+      - Pipeline value: {{PIPELINE_VALUE}}
+      Please review the pipeline metrics.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of pipeline tracking workflow for the execution log
