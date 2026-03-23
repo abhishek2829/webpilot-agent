@@ -1,0 +1,125 @@
+# ============================================================
+# WebPilot Workflow: Invoice Tracker
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Stripe invoices dashboard
+# 2. Extracting invoice counts and totals
+# 3. Summarizing paid vs unpaid invoices
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to Stripe
+# - Reviewing extracted invoice data
+# ============================================================
+
+name: invoice-tracker
+description: Track and summarize invoice status and totals from Stripe dashboard
+version: "1.0"
+tags:
+  - finance
+  - invoices
+estimated_duration_seconds: 150
+author: webpilot
+
+variables:
+  dashboard_url: "https://dashboard.stripe.com/invoices"   # default Stripe invoices URL
+  date_range: "last-30-days"                                # default date range
+
+credentials_required:
+  - stripe_email
+  - stripe_password
+
+steps:
+  # --- Step 1: Navigate to Stripe invoices ---
+  - type: navigate
+    url: "{{dashboard_url}}"
+    description: Open Stripe invoices dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for Stripe dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Stripe invoices dashboard is open.
+      Please confirm you are logged in and see the invoices list.
+      If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Extract total invoices ---
+  - type: extract
+    selector: "[class*='count'], .Table-rowCount, [data-testid='invoice-count']"
+    variable: TOTAL_INVOICES
+    description: Extract the total number of invoices
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Screenshot invoices list ---
+  - type: screenshot
+    description: Capture the invoices list
+
+  # --- Step 6: Click paid filter ---
+  - type: click
+    selector: "button:has-text('Paid'), a:has-text('Paid'), [data-testid='filter-paid']"
+    description: Filter to show only paid invoices
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 7: Wait for filter ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for filtered results to load
+
+  # --- Step 8: Extract paid count ---
+  - type: extract
+    selector: "[class*='count'], .Table-rowCount, [data-testid='invoice-count']"
+    variable: PAID_COUNT
+    description: Extract the count of paid invoices
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Navigate back to all invoices ---
+  - type: navigate
+    url: "{{dashboard_url}}"
+    description: Return to all invoices view
+
+  # --- Step 10: Wait for page ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for invoices page to reload
+
+  # --- Step 11: Extract unpaid count ---
+  - type: extract
+    selector: "[class*='outstanding'], [class*='unpaid'], [data-testid='unpaid-count']"
+    variable: UNPAID_COUNT
+    description: Extract the count of unpaid or outstanding invoices
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Extract total revenue ---
+  - type: extract
+    selector: "[class*='total'], [class*='amount'], [class*='revenue'], .summary-value"
+    variable: TOTAL_REVENUE
+    description: Extract the total revenue from invoices
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Checkpoint — Review invoice data ---
+  - type: checkpoint
+    message: >
+      Invoice tracker results for {{date_range}}:
+      - Total Invoices: {{TOTAL_INVOICES}}
+      - Paid: {{PAID_COUNT}}
+      - Unpaid: {{UNPAID_COUNT}}
+      - Total Revenue: {{TOTAL_REVENUE}}
+      Please review the data.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of invoice tracker for the execution log

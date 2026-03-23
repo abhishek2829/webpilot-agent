@@ -1,0 +1,112 @@
+# ============================================================
+# WebPilot Workflow: Market Validation
+# ============================================================
+# This workflow automates the process of:
+# 1. Searching ProductHunt for similar products
+# 2. Searching Reddit for relevant discussions
+# 3. Extracting market signals and competitor mentions
+#
+# Checkpoints pause for human approval before:
+# - Confirming ProductHunt results are relevant
+# - Reviewing Reddit discussion findings
+# ============================================================
+
+name: market-validation
+description: Validate a market idea by searching ProductHunt and Reddit for signals
+version: "1.0"
+tags:
+  - research
+  - market
+estimated_duration_seconds: 200
+author: webpilot
+
+variables:
+  search_query: ""                     # REQUIRED — user must provide
+  platforms: "producthunt,reddit"      # platforms to search
+
+credentials_required: []
+
+steps:
+  # --- Step 1: Navigate to ProductHunt search ---
+  - type: navigate
+    url: "https://www.producthunt.com/search?q={{search_query}}"
+    description: Search ProductHunt for products related to the query
+
+  # --- Step 2: Wait for search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for ProductHunt search results to load
+
+  # --- Step 3: Checkpoint — Confirm PH results ---
+  - type: checkpoint
+    message: >
+      ProductHunt search results for '{{search_query}}'.
+      Please confirm the results are relevant to your market research.
+    screenshot: true
+
+  # --- Step 4: Extract top products ---
+  - type: extract
+    selector: "[class*='item'] h3, [data-test='post-name'], .styles_titleContainer__title"
+    variable: PH_TOP_PRODUCTS
+    description: Extract top product names from ProductHunt search results
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Screenshot ProductHunt results ---
+  - type: screenshot
+    description: Capture ProductHunt search results
+
+  # --- Step 6: Navigate to Reddit search ---
+  - type: navigate
+    url: "https://www.reddit.com/search/?q={{search_query}}&sort=relevance"
+    description: Search Reddit for discussions related to the query
+
+  # --- Step 7: Wait for Reddit results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Reddit search results to load
+
+  # --- Step 8: Extract Reddit discussions ---
+  - type: extract
+    selector: "a[data-click-id='body'], faceplate-tracker[noun='post'] a, .Post h3"
+    variable: REDDIT_DISCUSSIONS
+    description: Extract top Reddit discussion titles
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Screenshot Reddit results ---
+  - type: screenshot
+    description: Capture Reddit search results
+
+  # --- Step 10: Click top Reddit post ---
+  - type: click
+    selector: "a[data-click-id='body']:first-of-type, faceplate-tracker[noun='post'] a:first-of-type"
+    description: Open the top Reddit discussion for deeper analysis
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 11: Wait for post to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for the Reddit post page to load
+
+  # --- Step 12: Screenshot Reddit post ---
+  - type: screenshot
+    description: Capture the top Reddit discussion content
+
+  # --- Step 13: Checkpoint — Review findings ---
+  - type: checkpoint
+    message: >
+      Market validation research complete.
+      - ProductHunt products: {{PH_TOP_PRODUCTS}}
+      - Reddit discussions: {{REDDIT_DISCUSSIONS}}
+      Please review the findings before completing.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of market validation research for the execution log

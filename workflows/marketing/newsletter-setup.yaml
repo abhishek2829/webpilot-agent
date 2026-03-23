@@ -1,0 +1,128 @@
+# ============================================================
+# WebPilot Workflow: Newsletter Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to ConvertKit
+# 2. Creating a signup form
+# 3. Configuring welcome email
+# 4. Extracting form URL and embed code
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to ConvertKit
+# - Saving the form and welcome email
+# ============================================================
+
+name: newsletter-setup
+description: Set up a newsletter signup form and welcome email on ConvertKit
+version: "1.0"
+tags:
+  - marketing
+  - email
+  - newsletter
+estimated_duration_seconds: 200
+author: webpilot
+
+variables:
+  form_name: ""                                         # REQUIRED — user must provide
+  welcome_subject: "Welcome!"                           # default welcome email subject
+  welcome_body: "Thanks for subscribing"                # default welcome email body
+  platform_url: "https://app.convertkit.com"            # default newsletter platform URL
+
+credentials_required:
+  - newsletter_email
+  - newsletter_password
+
+steps:
+  # --- Step 1: Navigate to ConvertKit ---
+  - type: navigate
+    url: "{{platform_url}}"
+    description: Open ConvertKit dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for ConvertKit to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      ConvertKit is open. Please confirm you are logged in.
+      If not, please log in manually and approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Navigate to forms ---
+  - type: click
+    selector: "a:has-text('Landing Pages & Forms'), a:has-text('Forms'), a[href*='forms']"
+    description: Navigate to the Forms section
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Click Create Form ---
+  - type: click
+    selector: "button:has-text('Create'), a:has-text('Create form'), button:has-text('New Form')"
+    description: Click to create a new form
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Select Form type ---
+  - type: click
+    selector: "button:has-text('Form'), [data-testid='form-type']"
+    description: Select Form type (not Landing Page)
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 7: Type form name ---
+  - type: type
+    selector: "input[placeholder*='name' i], input[name='name'], input[placeholder*='form' i]"
+    text: "{{form_name}}"
+    description: Enter the form name
+    fallback_strategy: llm_vision
+
+  # --- Step 8: Screenshot form creation ---
+  - type: screenshot
+    description: Capture the form creation interface
+
+  # --- Step 9: Click Save ---
+  - type: click
+    selector: "button:has-text('Save'), button:has-text('Create'), button[type='submit']"
+    description: Save the new form
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Wait for save ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the form to be saved
+
+  # --- Step 11: Extract form URL ---
+  - type: extract
+    selector: "input[value*='http'], [class*='share-url'], [class*='form-url'], a[href*='form']"
+    variable: FORM_URL
+    description: Extract the form URL for sharing
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Extract embed code ---
+  - type: extract
+    selector: "textarea[readonly], code, [class*='embed'], pre"
+    variable: EMBED_CODE
+    description: Extract the form embed code for website integration
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 13: Checkpoint — Review form ---
+  - type: checkpoint
+    message: >
+      Newsletter form '{{form_name}}' created.
+      - Form URL: {{FORM_URL}}
+      - Welcome subject: {{welcome_subject}}
+      Please review the form setup before completing.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of newsletter setup for the execution log

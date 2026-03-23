@@ -1,0 +1,126 @@
+# ============================================================
+# WebPilot Workflow: CRM Entry
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to HubSpot CRM
+# 2. Creating a new contact with provided details
+# 3. Extracting the new contact ID for reference
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to CRM
+# - Saving the new contact record
+# ============================================================
+
+name: crm-entry
+description: Create a new contact entry in HubSpot CRM
+version: "1.0"
+tags:
+  - sales
+  - crm
+estimated_duration_seconds: 150
+author: webpilot
+
+variables:
+  contact_name: ""                                      # REQUIRED — user must provide
+  contact_email: ""                                     # REQUIRED — user must provide
+  company: "Unknown"                                    # default company name
+  deal_stage: "New Lead"                                # default deal stage
+  crm_url: "https://app.hubspot.com/contacts"           # default CRM URL
+
+credentials_required:
+  - hubspot_email
+  - hubspot_password
+
+steps:
+  # --- Step 1: Navigate to CRM ---
+  - type: navigate
+    url: "{{crm_url}}"
+    description: Open HubSpot CRM contacts page
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for CRM to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      HubSpot CRM is open. Please confirm you are logged in.
+      If not, please log in manually and approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Click Create Contact ---
+  - type: click
+    selector: "button:has-text('Create contact'), button:has-text('Create'), [data-selenium-test='contacts-create-button']"
+    description: Click the Create Contact button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for form ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for the contact creation form to appear
+
+  # --- Step 6: Type contact email ---
+  - type: type
+    selector: "input[data-field='email'], input[placeholder*='email' i], input[name='email']"
+    text: "{{contact_email}}"
+    description: Enter the contact's email address
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Type first name ---
+  - type: type
+    selector: "input[data-field='firstname'], input[placeholder*='first' i], input[name='firstname']"
+    text: "{{contact_name}}"
+    description: Enter the contact's name
+    fallback_strategy: llm_vision
+
+  # --- Step 8: Type company ---
+  - type: type
+    selector: "input[data-field='company'], input[placeholder*='company' i], input[name='company']"
+    text: "{{company}}"
+    description: Enter the contact's company name
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 9: Screenshot form ---
+  - type: screenshot
+    description: Capture the filled contact creation form
+
+  # --- Step 10: Checkpoint — Confirm before saving ---
+  - type: checkpoint
+    message: >
+      Ready to create contact:
+      - Name: {{contact_name}}
+      - Email: {{contact_email}}
+      - Company: {{company}}
+      - Stage: {{deal_stage}}
+      Please confirm the details before saving.
+    screenshot: true
+
+  # --- Step 11: Click Save ---
+  - type: click
+    selector: "button:has-text('Create contact'), button:has-text('Save'), button[type='submit']"
+    description: Save the new contact record
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Wait for save ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the contact to be saved
+
+  # --- Step 13: Extract contact ID ---
+  - type: extract
+    selector: "[data-selenium-test='record-id'], .contact-id, [class*='record-id'], .private-link__anchor"
+    variable: CONTACT_ID
+    description: Extract the new contact's ID from the URL or page
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of CRM entry for the execution log

@@ -1,0 +1,123 @@
+# ============================================================
+# WebPilot Workflow: Subscription Audit
+# ============================================================
+# This workflow automates the process of:
+# 1. Searching email for subscription receipts
+# 2. Extracting active subscription details
+# 3. Calculating total monthly subscription costs
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to email
+# - Reviewing found subscriptions
+# ============================================================
+
+name: subscription-audit
+description: Audit active subscriptions by searching email for receipts and billing notifications
+version: "1.0"
+tags:
+  - finance
+  - subscriptions
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  email_url: "https://mail.google.com"                     # default email URL
+  search_term: "subscription OR receipt"                    # default search query
+
+credentials_required:
+  - email_account_email
+  - email_account_password
+
+steps:
+  # --- Step 1: Navigate to email ---
+  - type: navigate
+    url: "{{email_url}}"
+    description: Open email inbox
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for email inbox to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Email is open at '{{email_url}}'.
+      Please confirm you are logged in and see your inbox.
+      If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Click search box ---
+  - type: click
+    selector: "input[aria-label='Search mail'], input[name='q'], input[placeholder*='search' i]"
+    description: Click the search box in email
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Type search term ---
+  - type: type
+    selector: "input[aria-label='Search mail'], input[name='q'], input[placeholder*='search' i]"
+    text: "{{search_term}}"
+    description: Search for subscription-related emails
+    fallback_strategy: llm_vision
+
+  # --- Step 6: Click search button ---
+  - type: click
+    selector: "button[aria-label='Search mail'], button:has-text('Search'), [data-tooltip='Search mail']"
+    description: Execute the search
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Wait for search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for search results to load
+
+  # --- Step 8: Screenshot search results ---
+  - type: screenshot
+    description: Capture email search results for subscription receipts
+
+  # --- Step 9: Extract active subscriptions ---
+  - type: extract
+    selector: ".xY .xW, .zA .bog, tr.zA td.yX .y6 span"
+    variable: ACTIVE_SUBSCRIPTIONS
+    description: Extract email subjects related to subscriptions and receipts
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Click first result ---
+  - type: click
+    selector: "tr.zA:first-of-type, .xY:first-of-type .xW"
+    description: Open the first subscription-related email
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 11: Wait for email ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for the email to load
+
+  # --- Step 12: Extract monthly total ---
+  - type: extract
+    selector: "[class*='amount'], [class*='price'], [class*='total'], td:has-text('$')"
+    variable: MONTHLY_TOTAL
+    description: Extract subscription amounts from the email
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Checkpoint — Review subscriptions ---
+  - type: checkpoint
+    message: >
+      Subscription audit results:
+      - Active Subscriptions: {{ACTIVE_SUBSCRIPTIONS}}
+      - Monthly Total: {{MONTHLY_TOTAL}}
+      Please review the subscription data.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of subscription audit for the execution log

@@ -36,6 +36,11 @@ from pydantic import BaseModel, Field
 from src.agents.base import AgentRegistry, AgentTask
 from src.agents.devops_setup import DevOpsSetupAgent
 from src.agents.dispatcher import AgentDispatcher, DispatchError
+from src.agents.finance import FinanceAgent
+from src.agents.manager import ManagerAgent
+from src.agents.marketing import MarketingAgent
+from src.agents.research import ResearchAgent
+from src.agents.sales import SalesAgent
 from src.core.models import CheckpointResult
 from src.core.workflow_registry import WorkflowRegistry, WorkflowNotFoundError
 
@@ -127,12 +132,19 @@ def create_app(workflows_dir: Path | None = None) -> FastAPI:
     registry = WorkflowRegistry(workflows_dir=wf_dir)
     registry.load_all()
 
-    # Initialize agent system
+    # Initialize agent system — register all agents
     agent_registry = AgentRegistry()
-    devops_agent = DevOpsSetupAgent(workflows_dir=wf_dir)
-    agent_registry.register(devops_agent)
+    agent_registry.register(DevOpsSetupAgent(workflows_dir=wf_dir))
+    agent_registry.register(ResearchAgent())
+    agent_registry.register(SalesAgent())
+    agent_registry.register(MarketingAgent())
+    agent_registry.register(FinanceAgent())
 
     dispatcher = AgentDispatcher(registry=agent_registry)
+
+    # Manager agent uses the dispatcher to orchestrate pipelines
+    manager_agent = ManagerAgent(dispatcher=dispatcher)
+    agent_registry.register(manager_agent)
 
     # Store in app state
     app.state.registry = registry
@@ -332,6 +344,24 @@ def create_app(workflows_dir: Path | None = None) -> FastAPI:
             _checkpoint_connections.pop(execution_id, None)
             _checkpoint_responses.pop(execution_id, None)
 
+    # ── Pipelines ──
+
+    @app.get("/api/pipelines")
+    async def list_pipelines():
+        """List all available multi-agent pipelines."""
+        return manager_agent.list_pipelines()
+
+    @app.post("/api/pipelines/{name}/run")
+    async def run_pipeline(name: str, request: AgentExecutionRequest):
+        """Run a multi-agent pipeline by name."""
+        result = await manager_agent.run_pipeline(
+            pipeline_name=name,
+            global_variables=request.parameters,
+            checkpoint_mode=request.checkpoint_mode,
+            headless=request.headless,
+        )
+        return result.to_dict()
+
     # ── Dispatcher Stats ──
 
     @app.get("/api/stats")
@@ -346,6 +376,7 @@ def create_app(workflows_dir: Path | None = None) -> FastAPI:
                     for name in agent_registry.names
                 ]
             },
+            "pipelines": manager_agent.list_pipelines(),
             "workflows": {
                 "total": registry.count,
                 "names": registry.names,

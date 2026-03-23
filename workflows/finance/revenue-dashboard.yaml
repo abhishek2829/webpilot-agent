@@ -1,0 +1,129 @@
+# ============================================================
+# WebPilot Workflow: Revenue Dashboard
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Stripe dashboard
+# 2. Extracting MRR, revenue, customer count, and churn
+# 3. Summarizing key SaaS metrics
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to Stripe
+# - Reviewing extracted revenue metrics
+# ============================================================
+
+name: revenue-dashboard
+description: Extract key SaaS revenue metrics from Stripe dashboard including MRR, customers, and churn
+version: "1.0"
+tags:
+  - finance
+  - revenue
+  - saas
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  dashboard_url: "https://dashboard.stripe.com"            # default Stripe dashboard URL
+  period: "monthly"                                         # default reporting period
+
+credentials_required:
+  - stripe_email
+  - stripe_password
+
+steps:
+  # --- Step 1: Navigate to Stripe dashboard ---
+  - type: navigate
+    url: "{{dashboard_url}}"
+    description: Open Stripe main dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for Stripe dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Stripe dashboard is open.
+      Please confirm you are logged in and see the overview.
+      If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Screenshot dashboard overview ---
+  - type: screenshot
+    description: Capture the Stripe dashboard overview
+
+  # --- Step 5: Extract MRR ---
+  - type: extract
+    selector: "[class*='mrr'], [data-testid='mrr'], .DashboardMetric:has-text('MRR') .metric-value"
+    variable: MRR
+    description: Extract Monthly Recurring Revenue from dashboard
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Extract total revenue ---
+  - type: extract
+    selector: "[class*='gross-volume'], [class*='revenue'], [data-testid='gross-volume'], .DashboardMetric:has-text('Gross volume') .metric-value"
+    variable: TOTAL_REVENUE
+    description: Extract total gross revenue
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Navigate to customers ---
+  - type: click
+    selector: "a:has-text('Customers'), a[href*='customers']"
+    description: Navigate to the Customers section
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 8: Wait for customers page ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for customers page to load
+
+  # --- Step 9: Extract customer count ---
+  - type: extract
+    selector: "[class*='count'], .Table-rowCount, [data-testid='customer-count'], h2"
+    variable: CUSTOMER_COUNT
+    description: Extract the total number of customers
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Screenshot customers ---
+  - type: screenshot
+    description: Capture the customers overview
+
+  # --- Step 11: Navigate to billing ---
+  - type: navigate
+    url: "https://dashboard.stripe.com/billing"
+    description: Navigate to Stripe Billing for churn data
+
+  # --- Step 12: Wait for billing ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for billing page to load
+
+  # --- Step 13: Extract churn rate ---
+  - type: extract
+    selector: "[class*='churn'], [data-testid='churn-rate'], .DashboardMetric:has-text('Churn') .metric-value"
+    variable: CHURN_RATE
+    description: Extract the subscriber churn rate
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 14: Checkpoint — Review revenue metrics ---
+  - type: checkpoint
+    message: >
+      Revenue dashboard metrics ({{period}}):
+      - MRR: {{MRR}}
+      - Total Revenue: {{TOTAL_REVENUE}}
+      - Customer Count: {{CUSTOMER_COUNT}}
+      - Churn Rate: {{CHURN_RATE}}
+      Please review the SaaS metrics.
+    screenshot: true
+
+  # --- Step 15: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of revenue dashboard for the execution log

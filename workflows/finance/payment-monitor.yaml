@@ -1,0 +1,124 @@
+# ============================================================
+# WebPilot Workflow: Payment Monitor
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Stripe payments dashboard
+# 2. Filtering payments by date range
+# 3. Extracting success/failure counts and totals
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to Stripe
+# - Reviewing payment monitoring data
+# ============================================================
+
+name: payment-monitor
+description: Monitor payment success and failure rates from Stripe payments dashboard
+version: "1.0"
+tags:
+  - finance
+  - payments
+estimated_duration_seconds: 150
+author: webpilot
+
+variables:
+  dashboard_url: "https://dashboard.stripe.com/payments"   # default Stripe payments URL
+  date_range: "last-7-days"                                 # default date range
+
+credentials_required:
+  - stripe_email
+  - stripe_password
+
+steps:
+  # --- Step 1: Navigate to Stripe payments ---
+  - type: navigate
+    url: "{{dashboard_url}}"
+    description: Open Stripe payments dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for Stripe payments dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Stripe payments dashboard is open.
+      Please confirm you are logged in and see the payments list.
+      If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Screenshot payments overview ---
+  - type: screenshot
+    description: Capture the payments overview
+
+  # --- Step 5: Click succeeded filter ---
+  - type: click
+    selector: "button:has-text('Succeeded'), a:has-text('Succeeded'), [data-testid='status-succeeded']"
+    description: Filter to show succeeded payments
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 6: Wait for filter ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for filtered results to load
+
+  # --- Step 7: Extract successful payments ---
+  - type: extract
+    selector: "[class*='count'], .Table-rowCount, [data-testid='payment-count']"
+    variable: SUCCESSFUL_PAYMENTS
+    description: Extract the count of successful payments
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 8: Navigate back to payments ---
+  - type: navigate
+    url: "{{dashboard_url}}"
+    description: Return to all payments view
+
+  # --- Step 9: Click failed filter ---
+  - type: click
+    selector: "button:has-text('Failed'), a:has-text('Failed'), [data-testid='status-failed']"
+    description: Filter to show failed payments
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 10: Wait for filter ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for failed payments filter to load
+
+  # --- Step 11: Extract failed payments ---
+  - type: extract
+    selector: "[class*='count'], .Table-rowCount, [data-testid='payment-count']"
+    variable: FAILED_PAYMENTS
+    description: Extract the count of failed payments
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 12: Extract total amount ---
+  - type: extract
+    selector: "[class*='total'], [class*='gross'], [class*='volume'], .summary-value"
+    variable: TOTAL_AMOUNT
+    description: Extract the total payment amount or gross volume
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Checkpoint — Review payment data ---
+  - type: checkpoint
+    message: >
+      Payment monitoring results for {{date_range}}:
+      - Successful Payments: {{SUCCESSFUL_PAYMENTS}}
+      - Failed Payments: {{FAILED_PAYMENTS}}
+      - Total Amount: {{TOTAL_AMOUNT}}
+      Please review the payment data.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of payment monitor for the execution log

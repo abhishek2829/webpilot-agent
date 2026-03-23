@@ -1,0 +1,130 @@
+# ============================================================
+# WebPilot Workflow: Lead Research
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a company's website to gather info
+# 2. Searching LinkedIn for key people at the company
+# 3. Extracting company name, industry, and contacts
+#
+# Checkpoints pause for human approval before:
+# - Confirming company website loaded correctly
+# - Reviewing LinkedIn search results
+# ============================================================
+
+name: lead-research
+description: Research a company and find key contacts via LinkedIn
+version: "1.0"
+tags:
+  - research
+  - leads
+estimated_duration_seconds: 240
+author: webpilot
+
+variables:
+  company_url: ""                  # REQUIRED — user must provide
+  search_role: "CTO"              # default role to search for on LinkedIn
+
+credentials_required:
+  - linkedin_email
+  - linkedin_password
+
+steps:
+  # --- Step 1: Navigate to company website ---
+  - type: navigate
+    url: "{{company_url}}"
+    description: Open the target company's website
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for company site to fully load
+
+  # --- Step 3: Checkpoint — Confirm company site ---
+  - type: checkpoint
+    message: >
+      Navigated to '{{company_url}}'.
+      Please confirm this is the correct company website before proceeding.
+    screenshot: true
+
+  # --- Step 4: Extract company name ---
+  - type: extract
+    selector: "h1, [class*='brand'], title, [class*='logo'] img[alt]"
+    variable: COMPANY_NAME
+    description: Extract the company name from the website
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Extract industry info ---
+  - type: extract
+    selector: "[class*='about'], [class*='description'], meta[name='description']"
+    variable: INDUSTRY
+    description: Extract industry or company description
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Screenshot company page ---
+  - type: screenshot
+    description: Capture the company homepage
+
+  # --- Step 7: Navigate to LinkedIn ---
+  - type: navigate
+    url: https://www.linkedin.com/login
+    description: Open LinkedIn login page
+
+  # --- Step 8: Type LinkedIn email ---
+  - type: type
+    selector: "input#username, input[name='session_key']"
+    text: "{{linkedin_email}}"
+    description: Enter LinkedIn email address
+    fallback_strategy: llm_vision
+
+  # --- Step 9: Type LinkedIn password ---
+  - type: type
+    selector: "input#password, input[name='session_password']"
+    text: "{{linkedin_password}}"
+    description: Enter LinkedIn password
+    fallback_strategy: llm_vision
+
+  # --- Step 10: Click sign in ---
+  - type: click
+    selector: "button[type='submit'], button:has-text('Sign in')"
+    description: Click the Sign In button
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Wait for LinkedIn to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for LinkedIn feed to load after login
+
+  # --- Step 12: Navigate to search ---
+  - type: navigate
+    url: "https://www.linkedin.com/search/results/people/?keywords={{COMPANY_NAME}}%20{{search_role}}"
+    description: Search LinkedIn for key people at the company
+
+  # --- Step 13: Wait for search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for LinkedIn search results to load
+
+  # --- Step 14: Checkpoint — Review search results ---
+  - type: checkpoint
+    message: >
+      LinkedIn search results for '{{search_role}}' at '{{COMPANY_NAME}}'.
+      Please review the results and confirm they look relevant.
+    screenshot: true
+
+  # --- Step 15: Extract key people ---
+  - type: extract
+    selector: ".entity-result__title-text a, .reusable-search__result-container .app-aware-link span[aria-hidden='true']"
+    variable: KEY_PEOPLE
+    description: Extract names of key people from LinkedIn search results
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 16: Final screenshot ---
+  - type: screenshot
+    description: Capture final LinkedIn search results for the execution log

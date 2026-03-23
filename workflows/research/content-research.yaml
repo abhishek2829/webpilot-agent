@@ -1,0 +1,117 @@
+# ============================================================
+# WebPilot Workflow: Content Research
+# ============================================================
+# This workflow automates the process of:
+# 1. Searching Google for top-ranking content on a keyword
+# 2. Extracting top results and their structure
+# 3. Analyzing content patterns for SEO insights
+#
+# Checkpoints pause for human approval before:
+# - Confirming search results are relevant
+# - Reviewing extracted content analysis
+# ============================================================
+
+name: content-research
+description: Research top-ranking content for a keyword to inform content strategy
+version: "1.0"
+tags:
+  - research
+  - content
+  - seo
+estimated_duration_seconds: 200
+author: webpilot
+
+variables:
+  search_keyword: ""                   # REQUIRED — user must provide
+  result_count: "5"                    # number of top results to analyze
+
+credentials_required: []
+
+steps:
+  # --- Step 1: Navigate to Google search ---
+  - type: navigate
+    url: "https://www.google.com/search?q={{search_keyword}}"
+    description: Search Google for the target keyword
+
+  # --- Step 2: Wait for search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Google search results to load
+
+  # --- Step 3: Checkpoint — Confirm search results ---
+  - type: checkpoint
+    message: >
+      Google search results for '{{search_keyword}}'.
+      Please confirm the results are relevant to your content research.
+    screenshot: true
+
+  # --- Step 4: Extract top results ---
+  - type: extract
+    selector: "#search .g h3, #rso .g h3"
+    variable: TOP_RESULTS
+    description: Extract titles of top search results
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Screenshot search results ---
+  - type: screenshot
+    description: Capture Google search results page
+
+  # --- Step 6: Click on top result ---
+  - type: click
+    selector: "#search .g h3:first-of-type, #rso .g a:first-of-type h3"
+    description: Click on the top-ranking result to analyze its content
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Wait for article to load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the top-ranking article to load
+
+  # --- Step 8: Extract heading structure ---
+  - type: extract
+    selector: "h1, h2, h3"
+    variable: HEADING_STRUCTURE
+    description: Extract the heading structure of the top-ranking article
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Extract content length indicator ---
+  - type: extract
+    selector: "article, .post-content, .entry-content, main p"
+    variable: CONTENT_LENGTH
+    description: Extract main content body to estimate content length
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Screenshot top article ---
+  - type: screenshot
+    description: Capture the top-ranking article layout
+
+  # --- Step 11: Navigate back to search results ---
+  - type: navigate
+    url: "https://www.google.com/search?q={{search_keyword}}"
+    description: Return to Google search results
+
+  # --- Step 12: Wait for search results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for search results to reload
+
+  # --- Step 13: Checkpoint — Review content analysis ---
+  - type: checkpoint
+    message: >
+      Content research for '{{search_keyword}}' complete.
+      - Top results: {{TOP_RESULTS}}
+      - Heading structure: {{HEADING_STRUCTURE}}
+      - Content depth: {{CONTENT_LENGTH}}
+      Please review the analysis before completing.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of content research for the execution log

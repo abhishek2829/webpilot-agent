@@ -60,14 +60,25 @@
 
 **Grand total: 27/27 tasks complete, 446+ tests, 6 workflows, 1 agent**
 
+**Phase 6: Full Agent Fleet — COMPLETE (7/7 tasks, 44 tests, 20 new workflows)**
+- Task 28: ResearchAgent (`src/agents/research.py`) + 5 workflows (competitor-analysis, lead-research, market-validation, tech-stack-detect, content-research)
+- Task 29: SalesAgent (`src/agents/sales.py`) + 5 workflows (linkedin-connect, crm-entry, email-campaign, meeting-setup, proposal-gen)
+- Task 30: MarketingAgent (`src/agents/marketing.py`) + 5 workflows (social-post, seo-audit, blog-outline, newsletter-setup, analytics-report)
+- Task 31: FinanceAgent (`src/agents/finance.py`) + 5 workflows (invoice-tracker, payment-monitor, expense-report, subscription-audit, revenue-dashboard)
+- Task 32: ManagerAgent (`src/agents/manager.py`) — Pipeline orchestrator with 4 built-in pipelines (full-saas-setup, outbound-pipeline, content-launch, revenue-health-check)
+- Task 33: API v3 — All 6 agents registered, pipeline endpoints (GET /api/pipelines, POST /api/pipelines/{name}/run)
+- Task 34: Full fleet tests — 44 tests covering all agents, registry, dispatcher, pipelines
+
+**Grand total: 34/34 tasks complete, 490+ tests, 26 workflows, 6 agents, 4 pipelines**
+
 ## What to Build Next
 
 **Future enhancements:**
-- ResearchAgent, SalesAgent, MarketingAgent, FinanceAgent (new agent types)
-- Manager Agent (orchestrates multi-agent workflows)
 - Dashboard UI for checkpoint approvals and execution monitoring
 - PostgreSQL execution persistence (schema ready, wire to dispatcher)
 - Celery-backed agent execution for background processing
+- Custom pipeline builder (YAML-defined pipelines)
+- Agent marketplace (community-contributed workflows)
 
 **Full implementation plan:** `docs/plans/2026-03-22-webpilot-agent.md`
 
@@ -191,6 +202,20 @@ This is non-negotiable. Abhishek uses this to understand how the project is bein
 | TDD discipline | test-driven-development skill | 54 tests written FIRST, then implementation — all green |
 | ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
 
+### Phase 6: Arsenal Patterns Deployed
+
+| Pattern | Source | Where Applied |
+|---|---|---|
+| Multi-agent fleet | multi-agent-system pattern | `src/agents/` — 6 agents: DevOps, Research, Sales, Marketing, Finance, Manager |
+| Pipeline orchestration | workflow-engine patterns | `src/agents/manager.py` — Chains agents with input mapping, conditions, global variables |
+| Built-in pipelines | domain-driven design | `src/agents/manager.py` — 4 pipelines: full-saas-setup, outbound-pipeline, content-launch, revenue-health-check |
+| Agent-per-domain | microservices pattern | Each agent owns its own workflow directory (`workflows/{agent}/`) |
+| Input mapping | data-flow patterns | `PipelineStep.input_mapping` — pass extracted data between pipeline steps |
+| Conditional execution | workflow-engine patterns | `PipelineStep.condition` — skip steps based on previous results |
+| Compound-engineering | EveryInc/compound-engineering-plugin | All agents + ManagerAgent: get_stats(), get_lessons(), task logs |
+| TDD discipline | test-driven-development skill | 44 tests written FIRST — all green |
+| ai-dev-standards | ai-dev-standards skill | Standard depth: planned → documented → tested → reviewed |
+
 ## Code Conventions
 
 - **Async everywhere** — all browser and DB operations use async/await
@@ -235,6 +260,9 @@ pytest tests/unit/test_celery_queue.py -v
 # Phase 5 tests
 pytest tests/unit/test_agent_system.py -v
 
+# Phase 6 tests
+pytest tests/unit/test_full_agent_fleet.py -v
+
 # Skip integration tests (need real browser)
 pytest -m "not integration"
 ```
@@ -257,7 +285,7 @@ celery -A src.tasks.celery_app worker --loglevel=info -Q workflows
 ```
 webpilot-agent/
 ├── src/
-│   ├── agents/         # base.py (BaseAgent, AgentRegistry), devops_setup.py (DevOpsSetupAgent), dispatcher.py (AgentDispatcher)
+│   ├── agents/         # base.py, dispatcher.py, manager.py, devops_setup.py, research.py, sales.py, marketing.py, finance.py
 │   ├── core/           # models.py, config.py, workflow_registry.py, llm_brain.py, executor.py, recovery.py, database.py, logging.py
 │   ├── browser/        # session.py, actions.py, session_pool.py (BrowserSessionPool)
 │   ├── checkpoints/    # manager.py
@@ -266,9 +294,14 @@ webpilot-agent/
 │   ├── cli/            # main.py
 │   ├── security/       # middleware.py (API key auth, rate limiting, input sanitization, security headers)
 │   └── tasks/          # queue.py, celery_app.py, celery_queue.py, worker.py
-├── workflows/          # 6 YAML workflows: clerk-setup, vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup
+├── workflows/          # 26 YAML workflows organized by agent
+│   ├── *.yaml          # DevOps: clerk-setup, vercel-deploy, supabase-setup, stripe-setup, github-repo, domain-setup
+│   ├── research/       # competitor-analysis, lead-research, market-validation, tech-stack-detect, content-research
+│   ├── sales/          # linkedin-connect, crm-entry, email-campaign, meeting-setup, proposal-gen
+│   ├── marketing/      # social-post, seo-audit, blog-outline, newsletter-setup, analytics-report
+│   └── finance/        # invoice-tracker, payment-monitor, expense-report, subscription-audit, revenue-dashboard
 ├── alembic/            # Database migrations (async-compatible)
-├── tests/              # 446+ tests passing
+├── tests/              # 490+ tests passing
 ├── docs/plans/         # Implementation plan
 ├── docker-compose.yml  # PostgreSQL 16 + Redis 7
 └── CLAUDE.md           # THIS FILE

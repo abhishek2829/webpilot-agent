@@ -1,0 +1,111 @@
+# ============================================================
+# WebPilot Workflow: SEO Audit
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a site to extract meta tags
+# 2. Running PageSpeed Insights for performance data
+# 3. Extracting key SEO metrics
+#
+# Checkpoints pause for human approval before:
+# - Confirming the target site loaded
+# - Reviewing the SEO audit results
+# ============================================================
+
+name: seo-audit
+description: Perform an SEO audit by extracting meta tags and running PageSpeed Insights
+version: "1.0"
+tags:
+  - marketing
+  - seo
+estimated_duration_seconds: 200
+author: webpilot
+
+variables:
+  site_url: ""                         # REQUIRED — user must provide
+  check_performance: "true"            # whether to run PageSpeed Insights
+
+credentials_required: []
+
+steps:
+  # --- Step 1: Navigate to target site ---
+  - type: navigate
+    url: "{{site_url}}"
+    description: Open the target website for SEO analysis
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the site to fully load
+
+  # --- Step 3: Checkpoint — Confirm site loaded ---
+  - type: checkpoint
+    message: >
+      Target site '{{site_url}}' is loaded.
+      Please confirm it loaded correctly before running the SEO audit.
+    screenshot: true
+
+  # --- Step 4: Extract page title ---
+  - type: extract
+    selector: "title"
+    variable: PAGE_TITLE
+    description: Extract the page title tag
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Extract meta description ---
+  - type: extract
+    selector: "meta[name='description']"
+    variable: META_DESCRIPTION
+    description: Extract the meta description tag content
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 6: Screenshot target site ---
+  - type: screenshot
+    description: Capture the target site for the audit report
+
+  # --- Step 7: Navigate to PageSpeed Insights ---
+  - type: navigate
+    url: "https://pagespeed.web.dev/analysis?url={{site_url}}"
+    description: Run PageSpeed Insights analysis on the target site
+
+  # --- Step 8: Wait for analysis ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 60
+    description: Wait for PageSpeed Insights analysis to complete
+
+  # --- Step 9: Screenshot PageSpeed results ---
+  - type: screenshot
+    description: Capture the PageSpeed Insights results
+
+  # --- Step 10: Extract performance score ---
+  - type: extract
+    selector: ".lh-gauge__percentage, [class*='score'], .lh-exp-gauge__percentage"
+    variable: PERFORMANCE_SCORE
+    description: Extract the performance score from PageSpeed Insights
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Screenshot detailed metrics ---
+  - type: screenshot
+    description: Capture detailed performance metrics
+
+  # --- Step 12: Checkpoint — Review SEO results ---
+  - type: checkpoint
+    message: >
+      SEO audit complete for '{{site_url}}':
+      - Page Title: {{PAGE_TITLE}}
+      - Meta Description: {{META_DESCRIPTION}}
+      - Performance Score: {{PERFORMANCE_SCORE}}
+      Please review the audit results.
+    screenshot: true
+
+  # --- Step 13: Screenshot opportunities ---
+  - type: screenshot
+    description: Capture PageSpeed improvement opportunities
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of SEO audit for the execution log

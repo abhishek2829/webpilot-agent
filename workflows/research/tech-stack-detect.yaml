@@ -1,0 +1,103 @@
+# ============================================================
+# WebPilot Workflow: Tech Stack Detection
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a target website
+# 2. Inspecting page source for framework hints
+# 3. Using BuiltWith to identify the full tech stack
+#
+# Checkpoints pause for human approval before:
+# - Confirming the target site loaded
+# - Reviewing detected technologies
+# ============================================================
+
+name: tech-stack-detect
+description: Detect the technology stack used by a website via source inspection and BuiltWith
+version: "1.0"
+tags:
+  - research
+  - techstack
+estimated_duration_seconds: 150
+author: webpilot
+
+variables:
+  target_url: ""                     # REQUIRED — user must provide
+  check_performance: "true"          # whether to also check performance hints
+
+credentials_required: []
+
+steps:
+  # --- Step 1: Navigate to target site ---
+  - type: navigate
+    url: "{{target_url}}"
+    description: Open the target website to inspect
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the target site to fully load
+
+  # --- Step 3: Checkpoint — Confirm site loaded ---
+  - type: checkpoint
+    message: >
+      Navigated to '{{target_url}}'.
+      Please confirm the site loaded correctly before tech stack analysis.
+    screenshot: true
+
+  # --- Step 4: Extract frontend framework hints ---
+  - type: extract
+    selector: "script[src*='react'], script[src*='vue'], script[src*='angular'], script[src*='next'], meta[name='generator']"
+    variable: FRONTEND_FRAMEWORK
+    description: Extract frontend framework indicators from page source
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Screenshot target site ---
+  - type: screenshot
+    description: Capture the target website for reference
+
+  # --- Step 6: Navigate to BuiltWith ---
+  - type: navigate
+    url: "https://builtwith.com/{{target_url}}"
+    description: Look up the target site on BuiltWith for detailed tech analysis
+
+  # --- Step 7: Wait for BuiltWith results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for BuiltWith analysis to load
+
+  # --- Step 8: Extract analytics tools ---
+  - type: extract
+    selector: "[class*='analytics'] .techItem, .card-body:has(.card-title:has-text('Analytics')) a"
+    variable: ANALYTICS
+    description: Extract analytics and tracking tools detected by BuiltWith
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Extract CDN info ---
+  - type: extract
+    selector: "[class*='cdn'] .techItem, .card-body:has(.card-title:has-text('CDN')) a"
+    variable: CDN
+    description: Extract CDN and hosting information
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Screenshot BuiltWith results ---
+  - type: screenshot
+    description: Capture BuiltWith analysis results
+
+  # --- Step 11: Checkpoint — Review detected tech ---
+  - type: checkpoint
+    message: >
+      Tech stack detection complete for '{{target_url}}'.
+      - Frontend: {{FRONTEND_FRAMEWORK}}
+      - Analytics: {{ANALYTICS}}
+      - CDN: {{CDN}}
+      Please review the detected technologies.
+    screenshot: true
+
+  # --- Step 12: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of tech stack detection for the execution log

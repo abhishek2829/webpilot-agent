@@ -1,0 +1,123 @@
+# ============================================================
+# WebPilot Workflow: Proposal Generation
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a client's website to gather info
+# 2. Opening a proposal tool to create a new proposal
+# 3. Extracting the proposal URL for sharing
+#
+# Checkpoints pause for human approval before:
+# - Confirming client info was extracted correctly
+# - Saving the proposal
+# ============================================================
+
+name: proposal-gen
+description: Generate a sales proposal by researching a client site and creating a proposal document
+version: "1.0"
+tags:
+  - sales
+  - proposal
+estimated_duration_seconds: 240
+author: webpilot
+
+variables:
+  client_url: ""                                        # REQUIRED — user must provide
+  proposal_tool_url: "https://app.proposify.com"        # default proposal tool URL
+
+credentials_required:
+  - proposal_tool_email
+  - proposal_tool_password
+
+steps:
+  # --- Step 1: Navigate to client website ---
+  - type: navigate
+    url: "{{client_url}}"
+    description: Open the client's website to gather information
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for client site to fully load
+
+  # --- Step 3: Extract client name ---
+  - type: extract
+    selector: "h1, [class*='brand'], title, [class*='logo'] img[alt]"
+    variable: CLIENT_NAME
+    description: Extract the client's company name
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 4: Screenshot client site ---
+  - type: screenshot
+    description: Capture the client website for reference
+
+  # --- Step 5: Checkpoint — Confirm client info ---
+  - type: checkpoint
+    message: >
+      Client website loaded: '{{client_url}}'.
+      Extracted client name: {{CLIENT_NAME}}.
+      Please confirm this is correct before creating the proposal.
+    screenshot: true
+
+  # --- Step 6: Navigate to proposal tool ---
+  - type: navigate
+    url: "{{proposal_tool_url}}"
+    description: Open the proposal creation tool
+
+  # --- Step 7: Wait for proposal tool ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for proposal tool to load
+
+  # --- Step 8: Click Create Proposal ---
+  - type: click
+    selector: "button:has-text('Create'), button:has-text('New Proposal'), a:has-text('Create')"
+    description: Click to create a new proposal
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Wait for template selection ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for template selection to appear
+
+  # --- Step 10: Click template or blank ---
+  - type: click
+    selector: "button:has-text('Blank'), [class*='template']:first-of-type, button:has-text('Start')"
+    description: Select a blank proposal or first template
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 11: Type proposal title ---
+  - type: type
+    selector: "input[placeholder*='title' i], input[name='title'], [contenteditable='true']:first-of-type"
+    text: "Proposal for {{CLIENT_NAME}}"
+    description: Enter the proposal title with client name
+    fallback_strategy: llm_vision
+
+  # --- Step 12: Screenshot proposal ---
+  - type: screenshot
+    description: Capture the proposal being created
+
+  # --- Step 13: Checkpoint — Review before saving ---
+  - type: checkpoint
+    message: >
+      Proposal for '{{CLIENT_NAME}}' is being created.
+      Please review and add any additional details before saving.
+    screenshot: true
+
+  # --- Step 14: Extract proposal URL ---
+  - type: extract
+    selector: "input[value*='http'], [class*='share-link'], a[href*='proposal'], .proposal-url"
+    variable: PROPOSAL_URL
+    description: Extract the proposal URL or share link
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 15: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of proposal generation for the execution log

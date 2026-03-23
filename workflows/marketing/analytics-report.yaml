@@ -1,0 +1,127 @@
+# ============================================================
+# WebPilot Workflow: Analytics Report
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Google Analytics
+# 2. Extracting key traffic metrics
+# 3. Capturing performance data for reporting
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to Google Analytics
+# - Reviewing extracted analytics data
+# ============================================================
+
+name: analytics-report
+description: Extract key metrics from Google Analytics for a performance report
+version: "1.0"
+tags:
+  - marketing
+  - analytics
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  analytics_url: "https://analytics.google.com"        # default analytics URL
+  date_range: "last-30-days"                            # default date range
+
+credentials_required:
+  - google_email
+  - google_password
+
+steps:
+  # --- Step 1: Navigate to Google Analytics ---
+  - type: navigate
+    url: "{{analytics_url}}"
+    description: Open Google Analytics dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for Google Analytics to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Google Analytics is open.
+      Please confirm you are logged in and the correct property is selected.
+      If not, log in and select the correct property, then approve.
+    screenshot: true
+
+  # --- Step 4: Navigate to reports overview ---
+  - type: click
+    selector: "a:has-text('Reports'), [data-guidedhelpid='reports']"
+    description: Navigate to the Reports section
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for reports ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for reports to load
+
+  # --- Step 6: Extract total visitors ---
+  - type: extract
+    selector: "[class*='metric-value'], [class*='users'], .scorecard-metric-value"
+    variable: TOTAL_VISITORS
+    description: Extract total visitors count
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Screenshot overview ---
+  - type: screenshot
+    description: Capture the analytics overview dashboard
+
+  # --- Step 8: Extract page views ---
+  - type: extract
+    selector: "[class*='pageviews'], [class*='views'], .scorecard-metric-value:nth-of-type(2)"
+    variable: PAGE_VIEWS
+    description: Extract total page views
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Extract bounce rate ---
+  - type: extract
+    selector: "[class*='bounce'], .scorecard-metric-value:nth-of-type(3)"
+    variable: BOUNCE_RATE
+    description: Extract bounce rate percentage
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Navigate to top pages ---
+  - type: click
+    selector: "a:has-text('Pages and screens'), a:has-text('Pages'), [data-guidedhelpid='pages']"
+    description: Navigate to top pages report
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 11: Wait for pages report ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for pages report to load
+
+  # --- Step 12: Extract top pages ---
+  - type: extract
+    selector: "table tbody tr td:first-child, [class*='dimension-value']"
+    variable: TOP_PAGES
+    description: Extract the list of top-performing pages
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Checkpoint — Review analytics data ---
+  - type: checkpoint
+    message: >
+      Analytics report for {{date_range}}:
+      - Total Visitors: {{TOTAL_VISITORS}}
+      - Page Views: {{PAGE_VIEWS}}
+      - Bounce Rate: {{BOUNCE_RATE}}
+      - Top Pages: {{TOP_PAGES}}
+      Please review the data before completing.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of analytics report for the execution log

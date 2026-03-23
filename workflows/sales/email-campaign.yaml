@@ -1,0 +1,130 @@
+# ============================================================
+# WebPilot Workflow: Email Campaign
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to an email campaign platform
+# 2. Creating a new campaign with subject and body
+# 3. Extracting the campaign ID for tracking
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to the platform
+# - Launching the campaign
+# ============================================================
+
+name: email-campaign
+description: Create an email outreach campaign on a cold email platform
+version: "1.0"
+tags:
+  - sales
+  - email
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  campaign_name: ""                                    # REQUIRED — user must provide
+  email_subject: ""                                    # REQUIRED — user must provide
+  email_body: "Hello {{contact_name}}"                 # default email body template
+  platform_url: "https://app.instantly.ai"             # default email platform URL
+
+credentials_required:
+  - email_platform_email
+  - email_platform_password
+
+steps:
+  # --- Step 1: Navigate to email platform ---
+  - type: navigate
+    url: "{{platform_url}}"
+    description: Open the email campaign platform
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the platform to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Email platform is open at '{{platform_url}}'.
+      Please confirm you are logged in. If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Click Create Campaign ---
+  - type: click
+    selector: "button:has-text('Create'), button:has-text('New Campaign'), a:has-text('Create')"
+    description: Click to create a new email campaign
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for form ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for campaign creation form to appear
+
+  # --- Step 6: Type campaign name ---
+  - type: type
+    selector: "input[placeholder*='campaign' i], input[name='name'], input[placeholder*='name' i]"
+    text: "{{campaign_name}}"
+    description: Enter the campaign name
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Click next or continue ---
+  - type: click
+    selector: "button:has-text('Next'), button:has-text('Continue'), button:has-text('Save')"
+    description: Proceed to email content step
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 8: Type email subject ---
+  - type: type
+    selector: "input[placeholder*='subject' i], input[name='subject'], [data-testid='subject-input']"
+    text: "{{email_subject}}"
+    description: Enter the email subject line
+    fallback_strategy: llm_vision
+
+  # --- Step 9: Type email body ---
+  - type: type
+    selector: "[contenteditable='true'], textarea[placeholder*='body' i], .email-editor, [data-testid='email-body']"
+    text: "{{email_body}}"
+    description: Enter the email body content
+    fallback_strategy: llm_vision
+
+  # --- Step 10: Screenshot campaign form ---
+  - type: screenshot
+    description: Capture the filled campaign creation form
+
+  # --- Step 11: Checkpoint — Review before save ---
+  - type: checkpoint
+    message: >
+      Email campaign ready to save:
+      - Campaign: {{campaign_name}}
+      - Subject: {{email_subject}}
+      Please review the campaign details before saving.
+    screenshot: true
+
+  # --- Step 12: Click Save/Create ---
+  - type: click
+    selector: "button:has-text('Save'), button:has-text('Create'), button[type='submit']"
+    description: Save the email campaign
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Wait for save ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the campaign to be saved
+
+  # --- Step 14: Extract campaign ID ---
+  - type: extract
+    selector: "[class*='campaign-id'], .campaign-header, [data-testid='campaign-id'], h1"
+    variable: CAMPAIGN_ID
+    description: Extract the campaign ID or name from the saved campaign page
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 15: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of email campaign for the execution log

@@ -1,0 +1,125 @@
+# ============================================================
+# WebPilot Workflow: Competitor Analysis
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a competitor's website
+# 2. Extracting company name, pricing, and key features
+# 3. Analyzing their product positioning
+#
+# Checkpoints pause for human approval before:
+# - Confirming the correct competitor site loaded
+# - Reviewing extracted data before completion
+# ============================================================
+
+name: competitor-analysis
+description: Analyze a competitor's website for pricing, features, and positioning
+version: "1.0"
+tags:
+  - research
+  - competitor
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  competitor_url: ""                # REQUIRED — user must provide
+  analyze_pricing: "true"          # whether to extract pricing info
+
+credentials_required: []
+
+steps:
+  # --- Step 1: Navigate to competitor site ---
+  - type: navigate
+    url: "{{competitor_url}}"
+    description: Open the competitor's website
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for competitor site to fully load
+
+  # --- Step 3: Checkpoint — Confirm correct site ---
+  - type: checkpoint
+    message: >
+      Navigated to '{{competitor_url}}'.
+      Please confirm this is the correct competitor website.
+    screenshot: true
+
+  # --- Step 4: Extract competitor name ---
+  - type: extract
+    selector: "h1, [class*='brand'], [class*='logo'] img[alt], title"
+    variable: COMPETITOR_NAME
+    description: Extract the competitor's company or product name
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Screenshot homepage ---
+  - type: screenshot
+    description: Capture the competitor homepage for reference
+
+  # --- Step 6: Navigate to pricing page ---
+  - type: click
+    selector: "a:has-text('Pricing'), a:has-text('Plans'), a[href*='pricing']"
+    description: Click on the Pricing or Plans link
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 7: Wait for pricing page ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for pricing page to load
+
+  # --- Step 8: Extract pricing information ---
+  - type: extract
+    selector: "[class*='price'], [class*='plan'], [class*='tier'], .pricing-card"
+    variable: PRICING_INFO
+    description: Extract pricing tiers and amounts from the pricing page
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Screenshot pricing page ---
+  - type: screenshot
+    description: Capture the pricing page layout
+
+  # --- Step 10: Navigate to features page ---
+  - type: click
+    selector: "a:has-text('Features'), a:has-text('Product'), a[href*='features']"
+    description: Click on the Features or Product link
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 11: Wait for features page ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 10
+    description: Wait for features page to load
+
+  # --- Step 12: Extract key features ---
+  - type: extract
+    selector: "[class*='feature'], [class*='benefit'], .feature-list li, h3"
+    variable: KEY_FEATURES
+    description: Extract the key features listed on the features page
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Checkpoint — Review extracted data ---
+  - type: checkpoint
+    message: >
+      Competitor analysis data extracted:
+      - Name: {{COMPETITOR_NAME}}
+      - Pricing: {{PRICING_INFO}}
+      - Features: {{KEY_FEATURES}}
+      Please review the extracted information for accuracy.
+    screenshot: true
+
+  # --- Step 14: Navigate back to homepage ---
+  - type: navigate
+    url: "{{competitor_url}}"
+    description: Return to the competitor homepage for final screenshot
+
+  # --- Step 15: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of competitor analysis for the execution log

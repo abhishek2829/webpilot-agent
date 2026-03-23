@@ -1,0 +1,119 @@
+# ============================================================
+# WebPilot Workflow: Meeting Setup
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Calendly
+# 2. Creating a new event type for booking meetings
+# 3. Extracting the booking URL
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to Calendly
+# - Saving the new event type
+# ============================================================
+
+name: meeting-setup
+description: Create a Calendly event type for scheduling sales meetings
+version: "1.0"
+tags:
+  - sales
+  - meetings
+estimated_duration_seconds: 150
+author: webpilot
+
+variables:
+  event_name: ""                                       # REQUIRED — user must provide
+  duration_minutes: "30"                               # default meeting duration
+  event_description: "Quick intro call"                # default event description
+  calendly_url: "https://calendly.com/event_types"     # default Calendly URL
+
+credentials_required:
+  - calendly_email
+  - calendly_password
+
+steps:
+  # --- Step 1: Navigate to Calendly ---
+  - type: navigate
+    url: "{{calendly_url}}"
+    description: Open Calendly event types page
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Calendly to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Calendly is open. Please confirm you are logged in.
+      If not, please log in manually and approve this checkpoint.
+    screenshot: true
+
+  # --- Step 4: Click New Event Type ---
+  - type: click
+    selector: "button:has-text('New Event Type'), button:has-text('Create'), a:has-text('New Event')"
+    description: Click to create a new event type
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Select One-on-One ---
+  - type: click
+    selector: "button:has-text('One-on-One'), [data-testid='one-on-one']"
+    description: Select One-on-One event type
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 6: Type event name ---
+  - type: type
+    selector: "input[name='name'], input[placeholder*='event name' i], input[placeholder*='name' i]"
+    text: "{{event_name}}"
+    description: Enter the event type name
+    fallback_strategy: llm_vision
+
+  # --- Step 7: Type event description ---
+  - type: type
+    selector: "textarea[name='description'], textarea[placeholder*='description' i], [contenteditable='true']"
+    text: "{{event_description}}"
+    description: Enter the event description
+    fallback_strategy: llm_vision
+    optional: true
+
+  # --- Step 8: Screenshot form ---
+  - type: screenshot
+    description: Capture the event type creation form
+
+  # --- Step 9: Checkpoint — Confirm before saving ---
+  - type: checkpoint
+    message: >
+      Ready to create Calendly event:
+      - Name: {{event_name}}
+      - Duration: {{duration_minutes}} minutes
+      - Description: {{event_description}}
+      Please confirm before saving.
+    screenshot: true
+
+  # --- Step 10: Click Save ---
+  - type: click
+    selector: "button:has-text('Save'), button:has-text('Create'), button[type='submit']"
+    description: Save the new event type
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 11: Wait for save ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the event type to be saved
+
+  # --- Step 12: Extract booking URL ---
+  - type: extract
+    selector: "input[value*='calendly.com'], [class*='booking-link'], a[href*='calendly.com/'], .share-link"
+    variable: BOOKING_URL
+    description: Extract the booking URL for the new event type
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of meeting setup for the execution log

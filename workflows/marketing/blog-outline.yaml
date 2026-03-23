@@ -1,0 +1,118 @@
+# ============================================================
+# WebPilot Workflow: Blog Outline
+# ============================================================
+# This workflow automates the process of:
+# 1. Searching Google for top articles on a topic
+# 2. Analyzing heading patterns and content structure
+# 3. Extracting insights for creating a blog outline
+#
+# Checkpoints pause for human approval before:
+# - Confirming search results are relevant
+# - Reviewing extracted content patterns
+# ============================================================
+
+name: blog-outline
+description: Research top-ranking articles on a topic to create a competitive blog outline
+version: "1.0"
+tags:
+  - marketing
+  - content
+  - blog
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  blog_topic: ""                       # REQUIRED — user must provide
+  target_length: "1500"                # default target word count
+
+credentials_required: []
+
+steps:
+  # --- Step 1: Navigate to Google search ---
+  - type: navigate
+    url: "https://www.google.com/search?q={{blog_topic}}"
+    description: Search Google for the blog topic
+
+  # --- Step 2: Wait for results ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Google search results to load
+
+  # --- Step 3: Checkpoint — Confirm results ---
+  - type: checkpoint
+    message: >
+      Google search results for '{{blog_topic}}'.
+      Please confirm the results are relevant for blog research.
+    screenshot: true
+
+  # --- Step 4: Extract top articles ---
+  - type: extract
+    selector: "#search .g h3, #rso .g h3"
+    variable: TOP_ARTICLES
+    description: Extract titles of top-ranking articles on the topic
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Screenshot search results ---
+  - type: screenshot
+    description: Capture Google search results
+
+  # --- Step 6: Click top article ---
+  - type: click
+    selector: "#search .g h3:first-of-type, #rso .g a:first-of-type h3"
+    description: Open the top-ranking article
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 7: Wait for article ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the article page to load
+
+  # --- Step 8: Extract heading patterns ---
+  - type: extract
+    selector: "h1, h2, h3"
+    variable: HEADING_PATTERNS
+    description: Extract the heading hierarchy of the top article
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Screenshot article ---
+  - type: screenshot
+    description: Capture the top-ranking article structure
+
+  # --- Step 10: Navigate to Google Trends ---
+  - type: navigate
+    url: "https://trends.google.com/trends/explore?q={{blog_topic}}"
+    description: Check Google Trends for topic interest data
+
+  # --- Step 11: Wait for trends ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for Google Trends data to load
+
+  # --- Step 12: Extract trend data ---
+  - type: extract
+    selector: "[class*='trend'], [class*='interest'], .widget-container"
+    variable: TREND_DATA
+    description: Extract trend interest data for the blog topic
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 13: Checkpoint — Review research ---
+  - type: checkpoint
+    message: >
+      Blog outline research complete for '{{blog_topic}}':
+      - Top articles: {{TOP_ARTICLES}}
+      - Heading patterns: {{HEADING_PATTERNS}}
+      - Trend data: {{TREND_DATA}}
+      Target length: {{target_length}} words.
+      Please review before completing.
+    screenshot: true
+
+  # --- Step 14: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of blog outline research for the execution log

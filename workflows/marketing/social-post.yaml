@@ -1,0 +1,103 @@
+# ============================================================
+# WebPilot Workflow: Social Post
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to Twitter/X compose
+# 2. Typing post content
+# 3. Checkpoint before posting for review
+#
+# Checkpoints pause for human approval before:
+# - Confirming login status
+# - Publishing the post
+# ============================================================
+
+name: social-post
+description: Compose and publish a social media post on Twitter/X
+version: "1.0"
+tags:
+  - marketing
+  - social
+estimated_duration_seconds: 90
+author: webpilot
+
+variables:
+  post_content: ""                                      # REQUIRED — user must provide
+  platform_url: "https://twitter.com/compose/tweet"     # default post compose URL
+
+credentials_required:
+  - twitter_email
+  - twitter_password
+
+steps:
+  # --- Step 1: Navigate to Twitter compose ---
+  - type: navigate
+    url: "{{platform_url}}"
+    description: Open the Twitter/X compose tweet page
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the compose interface to load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Twitter/X compose page is open.
+      Please confirm you are logged in. If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Type post content ---
+  - type: type
+    selector: "[data-testid='tweetTextarea_0'], [role='textbox'], .public-DraftEditor-content"
+    text: "{{post_content}}"
+    description: Type the post content into the compose box
+    fallback_strategy: llm_vision
+
+  # --- Step 5: Wait briefly ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 5
+    description: Wait for any content processing
+
+  # --- Step 6: Screenshot composed post ---
+  - type: screenshot
+    description: Capture the composed post before publishing
+
+  # --- Step 7: Checkpoint — Confirm before posting ---
+  - type: checkpoint
+    message: >
+      Post content is ready:
+      '{{post_content}}'
+      Please review and confirm before publishing.
+    screenshot: true
+
+  # --- Step 8: Click Post/Tweet ---
+  - type: click
+    selector: "[data-testid='tweetButton'], button:has-text('Post'), button:has-text('Tweet')"
+    description: Click the Post button to publish
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Wait for post to publish ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for the post to be published
+
+  # --- Step 10: Extract post URL ---
+  - type: extract
+    selector: "a[href*='/status/'], [data-testid='toast'] a"
+    variable: POST_URL
+    description: Extract the published post URL
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+    optional: true
+
+  # --- Step 11: Screenshot confirmation ---
+  - type: screenshot
+    description: Capture the post confirmation
+
+  # --- Step 12: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of social post workflow for the execution log

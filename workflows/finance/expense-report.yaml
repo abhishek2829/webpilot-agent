@@ -1,0 +1,112 @@
+# ============================================================
+# WebPilot Workflow: Expense Report
+# ============================================================
+# This workflow automates the process of:
+# 1. Navigating to a bank dashboard
+# 2. Extracting transaction data and expense totals
+# 3. Summarizing expenses by category
+#
+# Checkpoints pause for human approval before:
+# - Confirming login to bank dashboard
+# - Reviewing extracted expense data
+# ============================================================
+
+name: expense-report
+description: Generate an expense report from bank transaction data
+version: "1.0"
+tags:
+  - finance
+  - expenses
+estimated_duration_seconds: 180
+author: webpilot
+
+variables:
+  bank_url: ""                         # REQUIRED — user must provide
+  date_range: "last-30-days"           # default date range
+
+credentials_required:
+  - bank_email
+  - bank_password
+
+steps:
+  # --- Step 1: Navigate to bank dashboard ---
+  - type: navigate
+    url: "{{bank_url}}"
+    description: Open the bank dashboard
+
+  # --- Step 2: Wait for page load ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 20
+    description: Wait for bank dashboard to fully load
+
+  # --- Step 3: Checkpoint — Confirm logged in ---
+  - type: checkpoint
+    message: >
+      Bank dashboard is open at '{{bank_url}}'.
+      Please confirm you are logged in and see your account.
+      If not, log in manually and approve.
+    screenshot: true
+
+  # --- Step 4: Click transactions ---
+  - type: click
+    selector: "a:has-text('Transactions'), a:has-text('Activity'), a[href*='transactions']"
+    description: Navigate to the transactions section
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 5: Wait for transactions ---
+  - type: wait
+    wait_for: networkidle
+    timeout_seconds: 15
+    description: Wait for transactions list to load
+
+  # --- Step 6: Screenshot transactions ---
+  - type: screenshot
+    description: Capture the transactions list
+
+  # --- Step 7: Extract total expenses ---
+  - type: extract
+    selector: "[class*='total'], [class*='expense'], [class*='debit'], .summary-amount"
+    variable: TOTAL_EXPENSES
+    description: Extract the total expense amount
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 8: Extract category breakdown ---
+  - type: extract
+    selector: "[class*='category'], [class*='tag'], .transaction-category, .spending-category"
+    variable: CATEGORY_BREAKDOWN
+    description: Extract expense categories and their amounts
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 9: Extract transaction count ---
+  - type: extract
+    selector: "[class*='count'], [class*='total-transactions'], .transaction-count"
+    variable: TRANSACTION_COUNT
+    description: Extract the total number of transactions
+    fallback_strategy: llm_vision
+    timeout_seconds: 10
+
+  # --- Step 10: Screenshot category breakdown ---
+  - type: screenshot
+    description: Capture the category breakdown view
+
+  # --- Step 11: Checkpoint — Review expense data ---
+  - type: checkpoint
+    message: >
+      Expense report for {{date_range}}:
+      - Total Expenses: {{TOTAL_EXPENSES}}
+      - Categories: {{CATEGORY_BREAKDOWN}}
+      - Transaction Count: {{TRANSACTION_COUNT}}
+      Please review the expense data.
+    screenshot: true
+
+  # --- Step 12: Screenshot summary ---
+  - type: screenshot
+    description: Capture the expense summary
+
+  # --- Step 13: Final screenshot ---
+  - type: screenshot
+    description: Capture final state of expense report for the execution log
